@@ -1671,17 +1671,91 @@ export const backfillSkillSearchDigestInternal = internalMutation({
   },
 })
 
-// Backfill owner fields (ownerHandle, ownerName, ownerDisplayName, ownerImage)
-// on existing skillSearchDigest rows.
-// Run once after deploying the schema change:
-//   npx convex run maintenance:backfillDigestOwnerFieldsInternal --prod
+const DIGEST_OWNER_BACKFILL_KEY = 'digest-owner-backfill'
+
+// Start/resume backfill:
+//   npx convex run maintenance:backfillDigestOwnerFields '{"batchSize":50,"delayMs":5000}' --prod
+// Stop:
+//   npx convex run maintenance:stopBackfillDigestOwnerFields --prod
+// Check status:
+//   npx convex run maintenance:backfillDigestOwnerFieldsStatus --prod
+export const backfillDigestOwnerFields = internalMutation({
+  args: {
+    batchSize: v.optional(v.number()),
+    delayMs: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    // Clear any previous stop flag and store config
+    const existing = await ctx.db
+      .query('skillStatBackfillState')
+      .withIndex('by_key', (q) => q.eq('key', DIGEST_OWNER_BACKFILL_KEY))
+      .unique()
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        cursor: undefined,
+        doneAt: undefined,
+        updatedAt: Date.now(),
+      })
+    } else {
+      await ctx.db.insert('skillStatBackfillState', {
+        key: DIGEST_OWNER_BACKFILL_KEY,
+        updatedAt: Date.now(),
+      })
+    }
+    // Kick off first batch
+    await ctx.scheduler.runAfter(0, internal.maintenance.backfillDigestOwnerFieldsInternal, {
+      batchSize: args.batchSize,
+      delayMs: args.delayMs,
+    })
+    return { started: true }
+  },
+})
+
+export const stopBackfillDigestOwnerFields = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const state = await ctx.db
+      .query('skillStatBackfillState')
+      .withIndex('by_key', (q) => q.eq('key', DIGEST_OWNER_BACKFILL_KEY))
+      .unique()
+    if (state) {
+      await ctx.db.patch(state._id, { doneAt: Date.now(), updatedAt: Date.now() })
+    }
+    return { stopped: true }
+  },
+})
+
+export const backfillDigestOwnerFieldsStatus = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const state = await ctx.db
+      .query('skillStatBackfillState')
+      .withIndex('by_key', (q) => q.eq('key', DIGEST_OWNER_BACKFILL_KEY))
+      .unique()
+    if (!state) return { status: 'never_started' }
+    if (state.doneAt) return { status: 'stopped', cursor: state.cursor, stoppedAt: state.doneAt }
+    return { status: 'running', cursor: state.cursor }
+  },
+})
+
 export const backfillDigestOwnerFieldsInternal = internalMutation({
   args: {
     cursor: v.optional(v.string()),
     batchSize: v.optional(v.number()),
+    delayMs: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Check stop flag
+    const state = await ctx.db
+      .query('skillStatBackfillState')
+      .withIndex('by_key', (q) => q.eq('key', DIGEST_OWNER_BACKFILL_KEY))
+      .unique()
+    if (state?.doneAt) {
+      return { patched: 0, isDone: false, scanned: 0, stopped: true }
+    }
+
     const batchSize = clampInt(args.batchSize ?? 200, 10, 500)
+    const delayMs = clampInt(args.delayMs ?? 0, 0, 60_000)
     const { page, continueCursor, isDone } = await ctx.db
       .query('skillSearchDigest')
       .paginate({ cursor: args.cursor ?? null, numItems: batchSize })
@@ -1700,14 +1774,24 @@ export const backfillDigestOwnerFieldsInternal = internalMutation({
       patched++
     }
 
-    if (!isDone) {
-      await ctx.scheduler.runAfter(0, internal.maintenance.backfillDigestOwnerFieldsInternal, {
+    // Save cursor progress
+    if (state) {
+      await ctx.db.patch(state._id, {
         cursor: continueCursor,
-        batchSize: args.batchSize,
+        doneAt: isDone ? Date.now() : undefined,
+        updatedAt: Date.now(),
       })
     }
 
-    return { patched, isDone, scanned: page.length }
+    if (!isDone) {
+      await ctx.scheduler.runAfter(delayMs, internal.maintenance.backfillDigestOwnerFieldsInternal, {
+        cursor: continueCursor,
+        batchSize: args.batchSize,
+        delayMs: args.delayMs,
+      })
+    }
+
+    return { patched, isDone, scanned: page.length, stopped: false }
   },
 })
 
