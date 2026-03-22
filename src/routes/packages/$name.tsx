@@ -5,6 +5,7 @@ import {
   fetchPackageDetail,
   fetchPackageReadme,
   fetchPackageVersion,
+  getPackageDownloadPath,
   type PackageDetailResponse,
   type PackageVersionDetail,
 } from "../../lib/packageApi";
@@ -102,7 +103,7 @@ function PackageDetailRoute() {
               <div>{pkg.latestVersion ? `Version ${pkg.latestVersion}` : "No latest tag"}</div>
               <div>
                 <a
-                  href={`${import.meta.env.VITE_CONVEX_URL}/api/v1/packages/${encodeURIComponent(name)}/download${pkg.latestVersion ? `?version=${encodeURIComponent(pkg.latestVersion)}` : ""}`}
+                  href={getPackageDownloadPath(name, pkg.latestVersion)}
                 >
                   Download zip
                 </a>

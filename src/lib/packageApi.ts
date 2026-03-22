@@ -71,9 +71,36 @@ export type PackageVersionDetail = {
   } | null;
 };
 
-function packageApiUrl(path: string) {
+function normalizeApiPath(path: string) {
+  return path.startsWith("/") ? path : `/${path}`;
+}
+
+async function packageApiUrl(path: string) {
+  const normalizedPath = normalizeApiPath(path);
+  if (typeof window !== "undefined") {
+    return new URL(normalizedPath, window.location.origin);
+  }
+  if (import.meta.env.SSR) {
+    try {
+      const serverRuntimeModule = "@tanstack/react-start/server";
+      const { getRequestUrl } = (await import(
+        /* @vite-ignore */ serverRuntimeModule
+      )) as {
+        getRequestUrl: () => URL;
+      };
+      return new URL(normalizedPath, getRequestUrl());
+    } catch {
+      // Fall through to env-based base URL when no request context exists.
+    }
+  }
   const base = getRequiredRuntimeEnv("VITE_CONVEX_URL");
-  return new URL(path.startsWith("/") ? path : `/${path}`, base);
+  return new URL(normalizedPath, base);
+}
+
+export function getPackageDownloadPath(name: string, version?: string | null) {
+  const path = normalizeApiPath(`${ApiRoutes.packages}/${encodeURIComponent(name)}/download`);
+  if (!version) return path;
+  return `${path}?version=${encodeURIComponent(version)}`;
 }
 
 async function getForwardedHeaders() {
@@ -124,7 +151,7 @@ export async function fetchPackages(params: {
   limit?: number;
 }) {
   if (params.q?.trim()) {
-    const url = packageApiUrl(`${ApiRoutes.packages}/search`);
+    const url = await packageApiUrl(`${ApiRoutes.packages}/search`);
     url.searchParams.set("q", params.q.trim());
     if (typeof params.limit === "number") url.searchParams.set("limit", String(params.limit));
     if (params.family) url.searchParams.set("family", params.family);
@@ -144,7 +171,7 @@ export async function fetchPackages(params: {
       : params.family === "bundle-plugin"
         ? ApiRoutes.bundlePlugins
         : ApiRoutes.packages;
-  const url = packageApiUrl(route);
+  const url = await packageApiUrl(route);
   if (params.family === "skill") url.searchParams.set("family", "skill");
   if (typeof params.limit === "number") url.searchParams.set("limit", String(params.limit));
   if (typeof params.isOfficial === "boolean") {
@@ -158,7 +185,7 @@ export async function fetchPackages(params: {
 }
 
 export async function fetchPackageDetail(name: string) {
-  const url = packageApiUrl(`${ApiRoutes.packages}/${encodeURIComponent(name)}`);
+  const url = await packageApiUrl(`${ApiRoutes.packages}/${encodeURIComponent(name)}`);
   const response = await packageFetch(url, "application/json");
   if (response.status === 404) {
     return {
@@ -171,7 +198,7 @@ export async function fetchPackageDetail(name: string) {
 }
 
 export async function fetchPackageVersion(name: string, version: string) {
-  const url = packageApiUrl(
+  const url = await packageApiUrl(
     `${ApiRoutes.packages}/${encodeURIComponent(name)}/versions/${encodeURIComponent(version)}`,
   );
   return await fetchJson<PackageVersionDetail>(url);
@@ -180,7 +207,7 @@ export async function fetchPackageVersion(name: string, version: string) {
 export async function fetchPackageReadme(name: string, version?: string | null) {
   const variants = ["README.md", "readme.md", "README.mdx", "readme.mdx"];
   for (const path of variants) {
-    const url = packageApiUrl(`${ApiRoutes.packages}/${encodeURIComponent(name)}/file`);
+    const url = await packageApiUrl(`${ApiRoutes.packages}/${encodeURIComponent(name)}/file`);
     url.searchParams.set("path", path);
     if (version) url.searchParams.set("version", version);
     const response = await packageFetch(url, "text/plain");

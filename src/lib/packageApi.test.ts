@@ -2,16 +2,25 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 const getRequestHeadersMock = vi.fn();
+const getRequestUrlMock = vi.fn();
 vi.mock("@tanstack/react-start/server", () => ({
   getRequestHeaders: () => getRequestHeadersMock(),
+  getRequestUrl: () => getRequestUrlMock(),
 }));
 
-import { fetchPackageDetail, fetchPackageReadme, fetchPackages } from "./packageApi";
+import {
+  fetchPackageDetail,
+  fetchPackageReadme,
+  fetchPackages,
+  getPackageDownloadPath,
+} from "./packageApi";
 
 describe("fetchPackages", () => {
   afterEach(() => {
     getRequestHeadersMock.mockReset();
+    getRequestUrlMock.mockReset();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
 
@@ -99,6 +108,7 @@ describe("fetchPackages", () => {
 
   it("forwards request cookies and includes credentials for package detail fetches", async () => {
     vi.stubEnv("VITE_CONVEX_URL", "https://registry.example");
+    getRequestUrlMock.mockReturnValue(new URL("https://app.example/packages/private-plugin"));
     getRequestHeadersMock.mockReturnValue(new Headers({ cookie: "session=abc" }));
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ package: null, owner: null }), { status: 200 }),
@@ -115,6 +125,30 @@ describe("fetchPackages", () => {
           cookie: "session=abc",
         }),
       }),
+    );
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://app.example/api/v1/packages/private-plugin");
+  });
+
+  it("uses the app origin for browser package detail fetches", async () => {
+    vi.stubEnv("VITE_CONVEX_URL", "https://registry.example");
+    vi.stubGlobal("window", {
+      location: { origin: "https://app.example" },
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ package: null, owner: null }), { status: 200 }),
+    );
+
+    await fetchPackageDetail("private-plugin");
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://app.example/api/v1/packages/private-plugin");
+  });
+
+  it("builds same-origin package download paths", () => {
+    expect(getPackageDownloadPath("private-plugin", "1.0.0")).toBe(
+      "/api/v1/packages/private-plugin/download?version=1.0.0",
+    );
+    expect(getPackageDownloadPath("private-plugin")).toBe(
+      "/api/v1/packages/private-plugin/download",
     );
   });
 });
