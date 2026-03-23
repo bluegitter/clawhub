@@ -185,6 +185,33 @@ type PublicPackageDoc = {
   updatedAt: number;
 };
 
+type DashboardPackageListItem = {
+  _id: Id<"packages">;
+  name: string;
+  displayName: string;
+  family: PackageFamily;
+  channel: PackageChannel;
+  isOfficial: boolean;
+  runtimeId: string | null;
+  summary: string | null;
+  ownerUserId: Id<"users">;
+  ownerPublisherId?: Id<"publishers">;
+  latestVersion: string | null;
+  stats: Doc<"packages">["stats"];
+  verification: Doc<"packages">["verification"];
+  scanStatus: Doc<"packages">["scanStatus"];
+  createdAt: number;
+  updatedAt: number;
+  pendingReview?: true;
+  latestRelease: {
+    version: string;
+    createdAt: number;
+    vtStatus: string | null;
+    llmStatus: string | null;
+    staticScanStatus: "clean" | "suspicious" | "malicious" | null;
+  } | null;
+};
+
 function isPackageBlockedFromPublic(scanStatus: Doc<"packages">["scanStatus"]) {
   return scanStatus === "pending" || scanStatus === "malicious";
 }
@@ -281,6 +308,109 @@ function toPublicPackageListItem(digest: PackageDigestLike): PublicPackageListIt
     executesCode: digest.executesCode ?? false,
     verificationTier: digest.verificationTier ?? null,
   };
+}
+
+async function toDashboardPackageListItem(
+  ctx: DbReaderCtx,
+  pkg: Doc<"packages">,
+): Promise<DashboardPackageListItem | null> {
+  if (pkg.softDeletedAt) return null;
+  const latestRelease = pkg.latestReleaseId ? await ctx.db.get(pkg.latestReleaseId) : null;
+  return {
+    _id: pkg._id,
+    name: pkg.name,
+    displayName: pkg.displayName,
+    family: pkg.family,
+    channel: pkg.channel,
+    isOfficial: pkg.isOfficial,
+    runtimeId: pkg.runtimeId ?? null,
+    summary: pkg.summary ?? null,
+    ownerUserId: pkg.ownerUserId,
+    ownerPublisherId: pkg.ownerPublisherId,
+    latestVersion: pkg.latestVersionSummary?.version ?? null,
+    stats: pkg.stats,
+    verification: pkg.verification,
+    scanStatus: pkg.scanStatus,
+    createdAt: pkg.createdAt,
+    updatedAt: pkg.updatedAt,
+    pendingReview: pkg.scanStatus === "pending" ? true : undefined,
+    latestRelease:
+      latestRelease && !latestRelease.softDeletedAt
+        ? {
+            version: latestRelease.version,
+            createdAt: latestRelease.createdAt,
+            vtStatus: latestRelease.vtAnalysis?.status ?? null,
+            llmStatus: latestRelease.llmAnalysis?.status ?? null,
+            staticScanStatus: latestRelease.staticScan?.status ?? null,
+          }
+        : null,
+  };
+}
+
+async function listDashboardPackagesForOwnerPublisher(
+  ctx: QueryCtx,
+  ownerPublisherId: Id<"publishers">,
+  viewerUserId: Id<"users">,
+  limit: number,
+) {
+  const takeLimit = Math.min(limit * 5, 500);
+  const ownerPublisher = await ctx.db.get(ownerPublisherId);
+  const membership =
+    (await ctx.db
+      .query("publisherMembers")
+      .withIndex("by_publisher_user", (q) =>
+        q.eq("publisherId", ownerPublisherId).eq("userId", viewerUserId),
+      )
+      .unique()) ?? null;
+  const isOwnDashboard = Boolean(
+    membership ||
+      (ownerPublisher?.kind === "user" && ownerPublisher.linkedUserId === viewerUserId),
+  );
+  if (!isOwnDashboard) return [];
+
+  const scopedEntries = await ctx.db
+    .query("packages")
+    .withIndex("by_owner_publisher", (q) => q.eq("ownerPublisherId", ownerPublisherId))
+    .order("desc")
+    .take(takeLimit);
+  const legacyEntries =
+    ownerPublisher?.kind === "user" && ownerPublisher.linkedUserId
+      ? await ctx.db
+          .query("packages")
+          .withIndex("by_owner", (q) => q.eq("ownerUserId", ownerPublisher.linkedUserId!))
+          .order("desc")
+          .take(takeLimit)
+      : [];
+
+  const combined = [...scopedEntries, ...legacyEntries].filter(
+    (pkg, index, all) =>
+      !pkg.softDeletedAt &&
+      (!pkg.ownerPublisherId || pkg.ownerPublisherId === ownerPublisherId) &&
+      all.findIndex((candidate) => candidate._id === pkg._id) === index,
+  );
+  const limited = combined.slice(0, limit);
+  return (
+    await Promise.all(limited.map(async (pkg) => await toDashboardPackageListItem(ctx, pkg)))
+  ).filter((pkg): pkg is DashboardPackageListItem => Boolean(pkg));
+}
+
+async function listDashboardPackagesForOwnerUser(
+  ctx: QueryCtx,
+  ownerUserId: Id<"users">,
+  viewerUserId: Id<"users">,
+  limit: number,
+) {
+  if (ownerUserId !== viewerUserId) return [];
+  const takeLimit = Math.min(limit * 5, 500);
+  const entries = await ctx.db
+    .query("packages")
+    .withIndex("by_owner", (q) => q.eq("ownerUserId", ownerUserId))
+    .order("desc")
+    .take(takeLimit);
+  const filtered = entries.filter((pkg) => !pkg.softDeletedAt).slice(0, limit);
+  return (
+    await Promise.all(filtered.map(async (pkg) => await toDashboardPackageListItem(ctx, pkg)))
+  ).filter((pkg): pkg is DashboardPackageListItem => Boolean(pkg));
 }
 
 function encodePublicPageCursor(state: PublicPageCursorState) {
@@ -707,6 +837,31 @@ export const getVersionByNameForViewerInternal = internalQuery({
       package: publicPackage,
       version: release,
     };
+  },
+});
+
+export const list = query({
+  args: {
+    ownerUserId: v.optional(v.id("users")),
+    ownerPublisherId: v.optional(v.id("publishers")),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const viewerUserId = await getAuthUserId(ctx);
+    if (!viewerUserId) return [];
+    const limit = Math.max(1, Math.min(args.limit ?? 50, 100));
+    if (args.ownerPublisherId) {
+      return await listDashboardPackagesForOwnerPublisher(
+        ctx,
+        args.ownerPublisherId,
+        viewerUserId,
+        limit,
+      );
+    }
+    if (args.ownerUserId) {
+      return await listDashboardPackagesForOwnerUser(ctx, args.ownerUserId, viewerUserId, limit);
+    }
+    return await listDashboardPackagesForOwnerUser(ctx, viewerUserId, viewerUserId, limit);
   },
 });
 

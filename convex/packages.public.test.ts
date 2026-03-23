@@ -4,6 +4,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getByName,
+  list,
   publishPackage,
   publishPackageForUserInternal,
   getVersionByName,
@@ -31,6 +32,21 @@ const getByNameHandler = (
       package: { name: string; latestVersion: string | null };
       latestRelease: { version: string } | null;
     } | null
+  >
+)._handler;
+const listHandler = (
+  list as unknown as WrappedHandler<
+    {
+      ownerUserId?: string;
+      ownerPublisherId?: string;
+      limit?: number;
+    },
+    Array<{
+      name: string;
+      pendingReview?: boolean;
+      scanStatus?: string;
+      latestRelease: { vtStatus: string | null; staticScanStatus: string | null } | null;
+    }>
   >
 )._handler;
 const getVersionByNameHandler = (
@@ -215,6 +231,8 @@ function makePackageDoc(overrides: Partial<Record<string, unknown>> = {}) {
     compatibility: null,
     capabilities: null,
     verification: null,
+    scanStatus: "clean",
+    stats: { downloads: 0, installs: 0, stars: 0, versions: 1 },
     createdAt: 1,
     updatedAt: 1,
     softDeletedAt: undefined,
@@ -1859,6 +1877,108 @@ describe("packages public queries", () => {
     );
 
     expect(result?.package?.name).toBe("demo-plugin");
+  });
+
+  it("lists owner packages with pending review and latest release scan state", async () => {
+    vi.mocked(getAuthUserId).mockResolvedValue("users:owner" as never);
+    const result = await listHandler(
+      {
+        db: {
+          get: vi.fn(async (id: string) => {
+            if (id === "packageReleases:demo-1") {
+              return makeReleaseDoc({
+                version: "1.0.0",
+                vtAnalysis: { status: "pending" },
+                llmAnalysis: { status: "clean" },
+                staticScan: { status: "clean" },
+              });
+            }
+            if (id === "publishers:owner") {
+              return { _id: "publishers:owner", kind: "user", linkedUserId: "users:owner" };
+            }
+            return null;
+          }),
+          query: vi.fn((table: string) => {
+            if (table === "packages") {
+              return {
+                withIndex: vi.fn((indexName: string) => {
+                  if (indexName === "by_owner_publisher") {
+                    return {
+                      order: vi.fn(() => ({
+                        take: vi.fn().mockResolvedValue([
+                          makePackageDoc({
+                            ownerPublisherId: "publishers:owner",
+                            scanStatus: "pending",
+                          }),
+                        ]),
+                      })),
+                    };
+                  }
+                  if (indexName === "by_owner") {
+                    return {
+                      order: vi.fn(() => ({
+                        take: vi.fn().mockResolvedValue([]),
+                      })),
+                    };
+                  }
+                  throw new Error(`Unexpected index ${indexName}`);
+                }),
+              };
+            }
+            if (table === "publisherMembers") {
+              return {
+                withIndex: vi.fn(() => ({
+                  unique: vi.fn().mockResolvedValue(null),
+                })),
+              };
+            }
+            throw new Error(`Unexpected table ${table}`);
+          }),
+        },
+      } as never,
+      { ownerPublisherId: "publishers:owner", limit: 20 },
+    );
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        name: "demo-plugin",
+        pendingReview: true,
+        scanStatus: "pending",
+        latestRelease: expect.objectContaining({
+          vtStatus: "pending",
+          staticScanStatus: "clean",
+        }),
+      }),
+    ]);
+  });
+
+  it("returns no owner packages when the viewer lacks access", async () => {
+    vi.mocked(getAuthUserId).mockResolvedValue("users:stranger" as never);
+    const result = await listHandler(
+      {
+        db: {
+          get: vi.fn(async (id: string) => {
+            if (id === "publishers:owner") {
+              return { _id: "publishers:owner", kind: "user", linkedUserId: "users:owner" };
+            }
+            return null;
+          }),
+          query: vi.fn((table: string) => {
+            if (table === "publisherMembers") {
+              return {
+                withIndex: vi.fn(() => ({
+                  unique: vi.fn().mockResolvedValue(null),
+                })),
+              };
+            }
+            throw new Error(`Unexpected table ${table}`);
+          }),
+        },
+      } as never,
+      { ownerPublisherId: "publishers:owner", limit: 20 },
+    );
+
+    expect(result).toEqual([]);
   });
 
   it("requires auth inside the public publish action", async () => {

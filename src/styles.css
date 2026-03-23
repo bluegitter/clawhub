@@ -3538,6 +3538,23 @@ html.theme-transition::view-transition-new(theme) {
   gap: 12px;
 }
 
+.dashboard-sections {
+  display: grid;
+  gap: 28px;
+}
+
+.dashboard-section {
+  display: grid;
+  gap: 12px;
+}
+
+.dashboard-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+}
+
 .dashboard-skill-card {
   display: flex;
   justify-content: space-between;
@@ -3594,6 +3611,37 @@ html.theme-transition::view-transition-new(theme) {
   margin-top: 8px;
   font-size: 0.8rem;
   color: var(--color-muted);
+  flex-wrap: wrap;
+}
+
+.dashboard-package-status {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 0.82rem;
+  color: var(--color-muted);
+  flex-wrap: wrap;
+}
+
+.dashboard-package-status span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dashboard-tag-warning {
+  background: color-mix(in srgb, #f59e0b 18%, transparent);
+  color: #b45309;
+}
+
+.dashboard-tag-danger {
+  background: color-mix(in srgb, #ef4444 18%, transparent);
+  color: #b91c1c;
+}
+
+.dashboard-tag-success {
+  background: color-mix(in srgb, #10b981 18%, transparent);
+  color: #047857;
 }
 
 .dashboard-skill-actions {
@@ -3620,6 +3668,12 @@ html.theme-transition::view-transition-new(theme) {
 }
 
 @media (max-width: 640px) {
+  .dashboard-header,
+  .dashboard-section-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .dashboard-skill-card {
     flex-direction: column;
     gap: 12px;
