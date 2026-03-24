@@ -316,15 +316,11 @@ export async function fetchPackageVersion(name: string, version: string) {
 }
 
 export async function fetchPackageReadme(name: string, version?: string | null) {
-  const variants = ["README.md", "readme.md", "README.mdx", "readme.mdx"];
-  for (const path of variants) {
-    const url = await packageApiUrl(`${ApiRoutes.packages}/${encodeURIComponent(name)}/file`);
-    url.searchParams.set("path", path);
-    if (version) url.searchParams.set("version", version);
-    const response = await packageFetch(url, "text/plain");
-    if (response.ok) return await response.text();
-    if (response.status === 403 || response.status === 423) return null;
-    if (response.status !== 404) throw new Error(await response.text());
-  }
-  return null;
+  const url = await packageApiUrl(`${ApiRoutes.packages}/${encodeURIComponent(name)}/file`);
+  url.searchParams.set("path", "README.md");
+  if (version) url.searchParams.set("version", version);
+  const response = await packageFetch(url, "text/plain");
+  if (response.ok) return await response.text();
+  if (response.status === 403 || response.status === 423 || response.status === 404) return null;
+  throw new Error(await response.text());
 }

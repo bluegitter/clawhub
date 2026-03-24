@@ -126,26 +126,23 @@ describe("fetchPackages", () => {
     expect(url.searchParams.get("limit")).toBe("7");
   });
 
-  it("falls back across supported README variants", async () => {
+  it("requests README through the canonical package file path once", async () => {
     vi.stubEnv("VITE_CONVEX_URL", "https://registry.example");
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(new Response("missing", { status: 404 }))
-      .mockResolvedValueOnce(new Response("lowercase readme", { status: 200 }));
+      .mockResolvedValue(new Response("lowercase readme", { status: 200 }));
 
     const result = await fetchPackageReadme("demo-plugin", "1.0.0");
 
     expect(result).toBe("lowercase readme");
-    const firstRequest = fetchMock.mock.calls[0]?.[0];
-    const secondRequest = fetchMock.mock.calls[1]?.[0];
-    if (typeof firstRequest !== "string" || typeof secondRequest !== "string") {
-      throw new Error("Expected fetch calls to use string URLs");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const requestUrl = fetchMock.mock.calls[0]?.[0];
+    if (typeof requestUrl !== "string") {
+      throw new Error("Expected fetch call to use a string URL");
     }
-    const first = new URL(firstRequest);
-    const second = new URL(secondRequest);
-    expect(first.searchParams.get("path")).toBe("README.md");
-    expect(second.searchParams.get("path")).toBe("readme.md");
-    expect(second.searchParams.get("version")).toBe("1.0.0");
+    const url = new URL(requestUrl);
+    expect(url.searchParams.get("path")).toBe("README.md");
+    expect(url.searchParams.get("version")).toBe("1.0.0");
   });
 
   it("returns an empty package detail payload on 404", async () => {
@@ -307,7 +304,7 @@ describe("fetchPackages", () => {
       .mockResolvedValue(new Response("missing", { status: 404 }));
 
     await expect(fetchPackageReadme("demo-plugin", "1.0.0")).resolves.toBeNull();
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("returns null when README access is blocked pending scan", async () => {

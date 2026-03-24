@@ -2873,6 +2873,62 @@ describe("httpApiV1 handlers", () => {
     });
   });
 
+  it("package file resolves lowercase readme variants from the canonical request path", async () => {
+    const runMutation = vi.fn().mockResolvedValue(okRate());
+    const runQuery = vi.fn(async (_query: unknown, args: Record<string, unknown>) => {
+      if ("name" in args) {
+        return {
+          package: {
+            _id: "packages:1",
+            name: "demo-plugin",
+            displayName: "Demo Plugin",
+            family: "code-plugin",
+            tags: {},
+            latestReleaseId: "packageReleases:1",
+            channel: "community",
+            isOfficial: false,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+          latestRelease: null,
+          owner: null,
+        };
+      }
+      if ("releaseId" in args) {
+        return {
+          _id: "packageReleases:1",
+          version: "1.0.0",
+          createdAt: 1,
+          changelog: "init",
+          files: [
+            {
+              path: "readme.md",
+              size: 5,
+              sha256: "a".repeat(64),
+              storageId: "storage:1",
+              contentType: "text/markdown",
+            },
+          ],
+        };
+      }
+      return null;
+    });
+
+    const response = await __handlers.packagesGetRouterV1Handler(
+      makeCtx({
+        runQuery,
+        runMutation,
+        storage: {
+          get: vi.fn().mockResolvedValue(new Blob(["hello"], { type: "text/markdown" })),
+        },
+      }),
+      new Request("https://example.com/api/v1/packages/demo-plugin/file?path=README.md"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("hello");
+  });
+
   it("package download uses a package/ root without registry metadata", async () => {
     const runMutation = vi.fn().mockResolvedValue(okRate());
     const runQuery = vi.fn(async (_query: unknown, args: Record<string, unknown>) => {

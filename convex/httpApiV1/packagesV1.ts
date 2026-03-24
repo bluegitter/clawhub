@@ -696,6 +696,23 @@ function resolveSkillFilePath(version: SkillVersionLike, requestedPath: string) 
   );
 }
 
+function resolvePackageFilePath(release: ReleaseLike, requestedPath: string) {
+  const normalized = requestedPath.trim();
+  const lower = normalized.toLowerCase();
+  if (isReadmeVariantPath(normalized)) {
+    return (
+      release.files.find((file) => isReadmeVariantPath(file.path)) ??
+      release.files.find((file) => file.path.toLowerCase() === lower) ??
+      null
+    );
+  }
+  return (
+    release.files.find((file) => file.path === normalized) ??
+    release.files.find((file) => file.path.toLowerCase() === lower) ??
+    null
+  );
+}
+
 async function getSkillDetailForRequest(ctx: ActionCtx, slug: string) {
   return (await runQueryRef(ctx, apiRefs.skills.getBySlug, { slug })) as
     | {
@@ -1027,7 +1044,7 @@ export async function packagesGetRouterV1Handler(ctx: ActionCtx, request: Reques
     if (!release) return text("Version not found", 404, rate.headers);
     const securityBlock = getReleaseSecurityBlock(release);
     if (securityBlock) return text(securityBlock.message, securityBlock.status, rate.headers);
-    const file = release.files.find((entry) => entry.path === path);
+    const file = resolvePackageFilePath(release, path);
     if (!file) return text("File not found", 404, rate.headers);
     if (!isTextFile(file.path, file.contentType)) {
       return text("Binary files are not served inline", 415, rate.headers);
