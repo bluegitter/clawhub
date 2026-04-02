@@ -12,6 +12,11 @@ import {
   MAX_PUBLISH_FILE_BYTES,
   MAX_PUBLISH_TOTAL_BYTES,
 } from "../../convex/lib/publishLimits";
+import {
+  checkLocalSlugAvailability,
+  publishLocalSkill,
+  shouldUseLocalBackend,
+} from "../lib/localBackend";
 import { getSiteMode } from "../lib/site";
 import { getPublicSlugCollision } from "../lib/slugCollision";
 import { expandDroppedItems, expandFilesWithReport } from "../lib/uploadFiles";
@@ -37,6 +42,7 @@ export const Route = createFileRoute("/publish-skill")({
 export function Upload() {
   const { isAuthenticated, me } = useAuthStatus();
   const { updateSlug } = useSearch({ from: "/publish-skill" });
+  const useLocalBackend = shouldUseLocalBackend();
   const siteMode = getSiteMode();
   const isSoulMode = siteMode === "souls";
   const requiredFileLabel = isSoulMode ? "SOUL.md" : "SKILL.md";
@@ -51,11 +57,11 @@ export function Upload() {
   );
   const existingSkill = useQuery(
     api.skills.getBySlug,
-    !isSoulMode && updateSlug ? { slug: updateSlug } : "skip",
+    !useLocalBackend && !isSoulMode && updateSlug ? { slug: updateSlug } : "skip",
   );
   const existingSoul = useQuery(
     api.souls.getBySlug,
-    isSoulMode && updateSlug ? { slug: updateSlug } : "skip",
+    !useLocalBackend && isSoulMode && updateSlug ? { slug: updateSlug } : "skip",
   );
   const existing = (isSoulMode ? existingSoul : existingSkill) as
     | {
@@ -160,7 +166,11 @@ export function Upload() {
   const trimmedChangelog = changelog.trim();
   const slugAvailability = useQuery(
     api.skills.checkSlugAvailability,
-    !isSoulMode && isAuthenticated && trimmedSlug && SLUG_PATTERN.test(trimmedSlug)
+    !useLocalBackend &&
+      !isSoulMode &&
+      isAuthenticated &&
+      trimmedSlug &&
+      SLUG_PATTERN.test(trimmedSlug)
       ? { slug: trimmedSlug.toLowerCase() }
       : "skip",
   ) as
@@ -172,14 +182,24 @@ export function Upload() {
       }
     | null
     | undefined;
+  const [localSlugAvailability, setLocalSlugAvailability] = useState<
+    | {
+        available: boolean;
+        reason: "available" | "taken" | "reserved";
+        message: string | null;
+        url: string | null;
+      }
+    | null
+    | undefined
+  >(undefined);
   const slugCollision = useMemo(
     () =>
       getPublicSlugCollision({
         isSoulMode,
         slug: trimmedSlug,
-        result: slugAvailability,
+        result: useLocalBackend ? localSlugAvailability : slugAvailability,
       }),
-    [isSoulMode, slugAvailability, trimmedSlug],
+    [isSoulMode, localSlugAvailability, slugAvailability, trimmedSlug, useLocalBackend],
   );
 
   useEffect(() => {
@@ -194,13 +214,39 @@ export function Upload() {
 
   useEffect(() => {
     if (ownerHandle) return;
+    if (useLocalBackend) {
+      if (me?.handle) {
+        setOwnerHandle(me.handle);
+      }
+      return;
+    }
     const personalPublisher = publisherMemberships?.find((entry) => entry.publisher.kind === "user");
     if (personalPublisher?.publisher.handle) {
       setOwnerHandle(personalPublisher.publisher.handle);
     }
-  }, [ownerHandle, publisherMemberships]);
+  }, [me?.handle, ownerHandle, publisherMemberships, useLocalBackend]);
 
   useEffect(() => {
+    if (!useLocalBackend || isSoulMode) return;
+    if (!isAuthenticated || !trimmedSlug || !SLUG_PATTERN.test(trimmedSlug)) {
+      setLocalSlugAvailability(undefined);
+      return;
+    }
+    let cancelled = false;
+    void checkLocalSlugAvailability(trimmedSlug.toLowerCase())
+      .then((result) => {
+        if (!cancelled) setLocalSlugAvailability(result);
+      })
+      .catch(() => {
+        if (!cancelled) setLocalSlugAvailability(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, isSoulMode, trimmedSlug, useLocalBackend]);
+
+  useEffect(() => {
+    if (useLocalBackend) return;
     if (changelogTouchedRef.current) return;
     if (trimmedChangelog) return;
     if (!trimmedSlug || !SLUG_PATTERN.test(trimmedSlug)) return;
@@ -254,6 +300,7 @@ export function Upload() {
     trimmedChangelog,
     trimmedSlug,
     version,
+    useLocalBackend,
   ]);
   const parsedTags = useMemo(
     () =>
@@ -332,7 +379,14 @@ export function Upload() {
   if (!isAuthenticated) {
     return (
       <main className="section">
-        <div className="card">Sign in to publish a {contentLabel}.</div>
+        <div className="card">
+          <p style={{ marginTop: 0 }}>Sign in to publish a {contentLabel}.</p>
+          {useLocalBackend ? (
+            <a className="btn btn-primary" href="/login">
+              Sign in locally
+            </a>
+          ) : null}
+        </div>
       </main>
     );
   }
@@ -373,58 +427,75 @@ export function Upload() {
       setError(`${requiredFileLabel} is required.`);
       return;
     }
-    setStatus("Uploading files…");
-
-    const uploaded = [] as Array<{
-      path: string;
-      size: number;
-      storageId: string;
-      sha256: string;
-      contentType?: string;
-    }>;
-
-    for (const file of files) {
-      const uploadUrl = await generateUploadUrl();
-      const rawPath = (file.webkitRelativePath || file.name).replace(/^\.\//, "");
-      const path =
-        stripRoot && rawPath.startsWith(`${stripRoot}/`)
-          ? rawPath.slice(stripRoot.length + 1)
-          : rawPath;
-      const sha256 = await hashFile(file);
-      const storageId = await uploadFile(uploadUrl, file);
-      uploaded.push({
-        path,
-        size: file.size,
-        storageId,
-        sha256,
-        contentType: file.type || undefined,
-      });
-    }
-
-    setStatus("Publishing…");
     try {
-      const result = await publishVersion({
-        ownerHandle: isSoulMode ? undefined : ownerHandle || undefined,
-        slug: trimmedSlug,
-        displayName: trimmedName,
-        version,
-        changelog: trimmedChangelog,
-        acceptLicenseTerms: isSoulMode ? undefined : acceptedLicenseTerms,
-        tags: parsedTags,
-        files: uploaded,
-      });
+      if (useLocalBackend) {
+        setStatus("Publishing…");
+        await publishLocalSkill({
+          slug: trimmedSlug,
+          displayName: trimmedName,
+          version,
+          changelog: trimmedChangelog,
+          tags: parsedTags,
+          files: files.map((file) => {
+            const rawPath = (file.webkitRelativePath || file.name).replace(/^\.\//, "");
+            const path =
+              stripRoot && rawPath.startsWith(`${stripRoot}/`)
+                ? rawPath.slice(stripRoot.length + 1)
+                : rawPath;
+            return { path, file };
+          }),
+        });
+      } else {
+        setStatus("Uploading files…");
+
+        const uploaded = [] as Array<{
+          path: string;
+          size: number;
+          storageId: string;
+          sha256: string;
+          contentType?: string;
+        }>;
+
+        for (const file of files) {
+          const uploadUrl = await generateUploadUrl();
+          const rawPath = (file.webkitRelativePath || file.name).replace(/^\.\//, "");
+          const path =
+            stripRoot && rawPath.startsWith(`${stripRoot}/`)
+              ? rawPath.slice(stripRoot.length + 1)
+              : rawPath;
+          const sha256 = await hashFile(file);
+          const storageId = await uploadFile(uploadUrl, file);
+          uploaded.push({
+            path,
+            size: file.size,
+            storageId,
+            sha256,
+            contentType: file.type || undefined,
+          });
+        }
+
+        setStatus("Publishing…");
+        await publishVersion({
+          ownerHandle: isSoulMode ? undefined : ownerHandle || undefined,
+          slug: trimmedSlug,
+          displayName: trimmedName,
+          version,
+          changelog: trimmedChangelog,
+          acceptLicenseTerms: isSoulMode ? undefined : acceptedLicenseTerms,
+          tags: parsedTags,
+          files: uploaded,
+        });
+      }
       setStatus(null);
       setError(null);
       setHasAttempted(false);
       setChangelogSource("user");
-      if (result) {
-        const ownerParam =
-          ownerHandle || me?.handle || (me?._id ? String(me._id) : "unknown");
-        void navigate({
-          to: isSoulMode ? "/souls/$slug" : "/$owner/$slug",
-          params: isSoulMode ? { slug: trimmedSlug } : { owner: ownerParam, slug: trimmedSlug },
-        });
-      }
+      const ownerParam =
+        ownerHandle || me?.handle || (me?._id ? String(me._id) : "unknown");
+      void navigate({
+        to: isSoulMode ? "/souls/$slug" : "/$owner/$slug",
+        params: isSoulMode ? { slug: trimmedSlug } : { owner: ownerParam, slug: trimmedSlug },
+      });
     } catch (publishError) {
       setStatus(null);
       setError(formatPublishError(publishError));
@@ -476,8 +547,22 @@ export function Upload() {
                 id="ownerHandle"
                 value={ownerHandle}
                 onChange={(event) => setOwnerHandle(event.target.value)}
+                disabled={useLocalBackend}
               >
-                {(publisherMemberships ?? []).map((entry) => (
+                {(useLocalBackend
+                  ? [
+                      {
+                        publisher: {
+                          _id: me?._id ? String(me._id) : "local-user",
+                          handle: me?.handle ?? "localdev",
+                          displayName: me?.displayName ?? me?.name ?? "Local User",
+                          kind: "user" as const,
+                        },
+                        role: "owner" as const,
+                      },
+                    ]
+                  : (publisherMemberships ?? [])
+                ).map((entry) => (
                   <option key={entry.publisher._id} value={entry.publisher.handle}>
                     @{entry.publisher.handle} · {entry.publisher.displayName}
                   </option>

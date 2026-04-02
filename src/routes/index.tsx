@@ -10,6 +10,7 @@ import { SoulStatsTripletLine } from "../components/SoulStats";
 import { UserBadge } from "../components/UserBadge";
 import { convexHttp } from "../convex/client";
 import { getSkillBadges } from "../lib/badges";
+import { fetchLocalSkillsList, shouldUseLocalBackend } from "../lib/localBackend";
 import type { PublicPublisher, PublicSkill, PublicSoul } from "../lib/publicUser";
 import { getSiteMode } from "../lib/site";
 
@@ -32,30 +33,42 @@ function SkillsHome() {
 
   const [highlighted, setHighlighted] = useState<SkillPageEntry[]>([]);
   const [popular, setPopular] = useState<SkillPageEntry[]>([]);
+  const useLocalBackend = shouldUseLocalBackend();
 
   useEffect(() => {
     let cancelled = false;
-    convexHttp
-      .query(api.skills.listHighlightedPublic, { limit: 6 })
-      .then((r) => {
-        if (!cancelled) setHighlighted(r as SkillPageEntry[]);
-      })
-      .catch(() => {});
-    convexHttp
-      .query(api.skills.listPublicPageV4, {
-        numItems: 12,
-        sort: "downloads",
-        dir: "desc",
-        nonSuspiciousOnly: true,
-      })
-      .then((r) => {
-        if (!cancelled) setPopular((r as { page: SkillPageEntry[] }).page);
-      })
-      .catch(() => {});
+    if (useLocalBackend) {
+      void fetchLocalSkillsList({ limit: 12 })
+        .then((result) => {
+          if (cancelled) return;
+          const entries = result.items as SkillPageEntry[];
+          setHighlighted(entries.slice(0, 6));
+          setPopular(entries);
+        })
+        .catch(() => {});
+    } else {
+      convexHttp
+        .query(api.skills.listHighlightedPublic, { limit: 6 })
+        .then((r) => {
+          if (!cancelled) setHighlighted(r as SkillPageEntry[]);
+        })
+        .catch(() => {});
+      convexHttp
+        .query(api.skills.listPublicPageV4, {
+          numItems: 12,
+          sort: "downloads",
+          dir: "desc",
+          nonSuspiciousOnly: true,
+        })
+        .then((r) => {
+          if (!cancelled) setPopular((r as { page: SkillPageEntry[] }).page);
+        })
+        .catch(() => {});
+    }
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [useLocalBackend]);
 
   return (
     <main>
@@ -109,6 +122,7 @@ function SkillsHome() {
               <SkillCard
                 key={entry.skill._id}
                 skill={entry.skill}
+                href={`/${encodeURIComponent(entry.ownerHandle ?? String(entry.skill.ownerUserId))}/${encodeURIComponent(entry.skill.slug)}`}
                 badge={getSkillBadges(entry.skill)}
                 summaryFallback="A fresh skill bundle."
                 meta={
@@ -141,6 +155,7 @@ function SkillsHome() {
               <SkillCard
                 key={entry.skill._id}
                 skill={entry.skill}
+                href={`/${encodeURIComponent(entry.ownerHandle ?? String(entry.skill.ownerUserId))}/${encodeURIComponent(entry.skill.slug)}`}
                 summaryFallback="Agent-ready skill pack."
                 meta={
                   <div className="skill-card-footer-rows">

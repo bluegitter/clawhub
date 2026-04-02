@@ -1,6 +1,11 @@
 import { api } from "../../convex/_generated/api";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
 import { convexHttp } from "../convex/client";
+import {
+  fetchLocalSkillDetail,
+  shouldUseLocalBackend,
+  type LocalSkillDetailData,
+} from "./localBackend";
 import type { PublicPublisher, PublicSkill } from "./publicUser";
 
 export type SkillBySlugResult = {
@@ -48,9 +53,22 @@ type SkillPageLoaderData = {
   summary: string | null;
   version: string | null;
   initialData: SkillPageInitialData | null;
+  localData: LocalSkillDetailData | null;
 };
 
 export async function fetchSkillPageData(slug: string): Promise<SkillPageLoaderData> {
+  if (shouldUseLocalBackend()) {
+    const localData = await fetchLocalSkillDetail(slug);
+    return {
+      owner: localData?.owner ?? null,
+      displayName: localData?.displayName ?? null,
+      summary: localData?.summary ?? null,
+      version: localData?.version ?? null,
+      initialData: null,
+      localData,
+    };
+  }
+
   try {
     const result = (await convexHttp.query(api.skills.getBySlug, {
       slug,
@@ -63,6 +81,7 @@ export async function fetchSkillPageData(slug: string): Promise<SkillPageLoaderD
         summary: null,
         version: null,
         initialData: null,
+        localData: null,
       };
     }
 
@@ -93,6 +112,7 @@ export async function fetchSkillPageData(slug: string): Promise<SkillPageLoaderD
         readme,
         readmeError,
       },
+      localData: null,
     };
   } catch {
     return {
@@ -101,6 +121,7 @@ export async function fetchSkillPageData(slug: string): Promise<SkillPageLoaderD
       summary: null,
       version: null,
       initialData: null,
+      localData: null,
     };
   }
 }

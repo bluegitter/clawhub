@@ -2,6 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
 import { useRef } from "react";
 import { api } from "../../../convex/_generated/api";
+import { shouldUseLocalBackend } from "../../lib/localBackend";
 import { parseSort } from "./-params";
 import { SkillsResults } from "./-SkillsResults";
 import { SkillsToolbar } from "./-SkillsToolbar";
@@ -51,7 +52,8 @@ export function SkillsIndex() {
   const navigate = Route.useNavigate();
   const search = Route.useSearch();
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const totalSkills = useQuery(api.skills.countPublicSkills);
+  const useLocalBackend = shouldUseLocalBackend();
+  const totalSkills = useQuery(api.skills.countPublicSkills, useLocalBackend ? "skip" : {});
   const totalSkillsText =
     typeof totalSkills === "number" ? totalSkills.toLocaleString("en-US") : null;
 

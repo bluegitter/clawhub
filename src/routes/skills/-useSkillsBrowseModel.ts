@@ -2,6 +2,7 @@ import { useAction } from "convex/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { api } from "../../../convex/_generated/api";
 import { convexHttp } from "../../convex/client";
+import { fetchLocalSkillsList, shouldUseLocalBackend } from "../../lib/localBackend";
 import { parseDir, parseSort, toListSort, type SortDir, type SortKey } from "./-params";
 import type { SkillListEntry, SkillSearchEntry } from "./-types";
 
@@ -48,6 +49,7 @@ export function useSkillsBrowseModel({
   const highlightedOnly = search.highlighted ?? false;
   const nonSuspiciousOnly = search.nonSuspicious ?? false;
   const searchSkills = useAction(api.search.searchSkills);
+  const useLocalBackend = shouldUseLocalBackend();
 
   const trimmedQuery = useMemo(() => query.trim(), [query]);
   const hasQuery = trimmedQuery.length > 0;
@@ -70,18 +72,32 @@ export function useSkillsBrowseModel({
   const fetchPage = useCallback(
     async (cursor: string | null, generation: number) => {
       try {
-        const result = await convexHttp.query(api.skills.listPublicPageV4, {
-          cursor: cursor ?? undefined,
-          numItems: pageSize,
-          sort: listSort,
-          dir,
-          highlightedOnly,
-          nonSuspiciousOnly,
-        });
+        let page: SkillListEntry[];
+        let nextCursor: string | null;
+
+        if (useLocalBackend) {
+          const result = await fetchLocalSkillsList({
+            cursor,
+            limit: pageSize,
+          });
+          page = result.items as SkillListEntry[];
+          nextCursor = result.nextCursor;
+        } else {
+          const result = await convexHttp.query(api.skills.listPublicPageV4, {
+            cursor: cursor ?? undefined,
+            numItems: pageSize,
+            sort: listSort,
+            dir,
+            highlightedOnly,
+            nonSuspiciousOnly,
+          });
+          page = result.page;
+          nextCursor = result.nextCursor;
+        }
         if (generation !== fetchGeneration.current) return;
-        setListResults((prev) => (cursor ? [...prev, ...result.page] : result.page));
-        const canAdvance = result.hasMore && result.nextCursor != null;
-        setListCursor(canAdvance ? result.nextCursor : null);
+        const canAdvance = nextCursor != null;
+        setListResults((prev) => (cursor ? [...prev, ...page] : page));
+        setListCursor(canAdvance ? nextCursor : null);
         setListStatus(canAdvance ? "idle" : "done");
       } catch (err) {
         if (generation !== fetchGeneration.current) return;
@@ -90,7 +106,7 @@ export function useSkillsBrowseModel({
         setListStatus(cursor ? "idle" : "done");
       }
     },
-    [listSort, dir, highlightedOnly, nonSuspiciousOnly],
+    [dir, highlightedOnly, listSort, nonSuspiciousOnly, useLocalBackend],
   );
 
   // Reset and fetch first page when sort/dir/filters change
@@ -138,12 +154,23 @@ export function useSkillsBrowseModel({
     const handle = window.setTimeout(() => {
       void (async () => {
         try {
-          const data = (await searchSkills({
-            query: trimmedQuery,
-            highlightedOnly,
-            nonSuspiciousOnly,
-            limit: searchLimit,
-          })) as Array<SkillSearchEntry>;
+          const data = useLocalBackend
+            ? (await fetchLocalSkillsList({
+                query: trimmedQuery,
+                limit: searchLimit,
+              })).items.map((entry) => ({
+                skill: entry.skill,
+                version: entry.latestVersion,
+                score: entry.searchScore ?? 1,
+                ownerHandle: entry.ownerHandle ?? null,
+                owner: entry.owner ?? null,
+              }))
+            : ((await searchSkills({
+                query: trimmedQuery,
+                highlightedOnly,
+                nonSuspiciousOnly,
+                limit: searchLimit,
+              })) as Array<SkillSearchEntry>);
           if (requestId === searchRequest.current) {
             setSearchResults(data);
           }
@@ -155,7 +182,15 @@ export function useSkillsBrowseModel({
       })();
     }, 220);
     return () => window.clearTimeout(handle);
-  }, [hasQuery, highlightedOnly, nonSuspiciousOnly, searchLimit, searchSkills, trimmedQuery]);
+  }, [
+    hasQuery,
+    highlightedOnly,
+    nonSuspiciousOnly,
+    searchLimit,
+    searchSkills,
+    trimmedQuery,
+    useLocalBackend,
+  ]);
 
   const baseItems = useMemo(() => {
     if (hasQuery) {

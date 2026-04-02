@@ -10,8 +10,7 @@ function readProcessEnv(name: string) {
 }
 
 function readClientMetaEnv(name: string) {
-  if (typeof window === "undefined") return undefined;
-  return readString((import.meta.env as Record<string, unknown>)[name]);
+  return readString((import.meta.env as Record<string, unknown> | undefined)?.[name]);
 }
 
 export function getRuntimeEnv(name: string) {
@@ -30,4 +29,45 @@ export function isDevRuntime() {
     return nodeEnv !== "production";
   }
   return Boolean(import.meta.env.DEV);
+}
+
+export function getLocalBackendOrigin() {
+  const explicit = getRuntimeEnv("VITE_LOCAL_BACKEND_URL");
+  if (explicit) return explicit;
+
+  if (typeof window !== "undefined") {
+    const { protocol, hostname } = window.location;
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      return `${protocol}//${hostname}:3001`;
+    }
+  }
+
+  const siteUrl = getRuntimeEnv("VITE_SITE_URL");
+  if (siteUrl) {
+    try {
+      const url = new URL(siteUrl);
+      if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
+        return `${url.protocol}//${url.hostname}:3001`;
+      }
+    } catch {
+      // ignore invalid URLs
+    }
+  }
+
+  return null;
+}
+
+export function getAppOrigin() {
+  const explicit = getRuntimeEnv("VITE_APP_URL") ?? getRuntimeEnv("APP_URL") ?? getRuntimeEnv("VITE_SITE_URL");
+  if (explicit) return explicit;
+
+  if (typeof window !== "undefined") {
+    return window.location.origin;
+  }
+
+  return "http://localhost:3000";
+}
+
+export function shouldUseLocalLogin() {
+  return Boolean(getLocalBackendOrigin());
 }

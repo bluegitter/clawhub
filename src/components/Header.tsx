@@ -4,7 +4,9 @@ import { Menu, Monitor, Moon, Sun } from "lucide-react";
 import { useMemo, useRef } from "react";
 import { getUserFacingConvexError } from "../lib/convexError";
 import { gravatarUrl } from "../lib/gravatar";
+import { getLocalAuthLoginUrl, getLocalAuthLogoutUrl } from "../lib/localBackend";
 import { isModerator } from "../lib/roles";
+import { shouldUseLocalLogin } from "../lib/runtimeEnv";
 import { getClawHubSiteUrl, getSiteMode, getSiteName } from "../lib/site";
 import { applyTheme, useThemeMode } from "../lib/theme";
 import { startThemeTransition } from "../lib/theme-transition";
@@ -35,6 +37,12 @@ export default function Header() {
   const isStaff = isModerator(me);
   const { error: authError, clear: clearAuthError } = useAuthError();
   const signInRedirectTo = getCurrentRelativeUrl();
+  const useLocalLogin = shouldUseLocalLogin();
+  const localLoginHref = useLocalLogin ? getLocalAuthLoginUrl() : null;
+  const localLogoutHref =
+    useLocalLogin && typeof window !== "undefined"
+      ? getLocalAuthLogoutUrl(`${window.location.origin}/`)
+      : null;
 
   const setTheme = (next: "system" | "light" | "dark") => {
     startThemeTransition({
@@ -47,6 +55,14 @@ export default function Header() {
       },
       context: { element: toggleRef.current },
     });
+  };
+
+  const handleSignOut = () => {
+    if (localLogoutHref) {
+      window.location.assign(localLogoutHref);
+      return;
+    }
+    void signOut();
   };
 
   return (
@@ -280,7 +296,7 @@ export default function Header() {
                   <Link to="/settings">Settings</Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => void signOut()}>Sign out</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSignOut}>Sign out</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
@@ -304,25 +320,32 @@ export default function Header() {
                   </button>
                 </div>
               ) : null}
-              <button
-                className="btn btn-primary"
-                type="button"
-                disabled={isLoading}
-                onClick={() => {
-                  clearAuthError();
-                  void signIn(
-                    "github",
-                    signInRedirectTo ? { redirectTo: signInRedirectTo } : undefined,
-                  ).catch((error) => {
-                    setAuthError(
-                      getUserFacingConvexError(error, "Sign in failed. Please try again."),
-                    );
-                  });
-                }}
-              >
-                <span className="sign-in-label">Sign in</span>
-                <span className="sign-in-provider">with GitHub</span>
-              </button>
+              {useLocalLogin ? (
+                <a className="btn btn-primary" href={localLoginHref ?? "/login"}>
+                  <span className="sign-in-label">Sign in</span>
+                  <span className="sign-in-provider">with SSO</span>
+                </a>
+              ) : (
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  disabled={isLoading}
+                  onClick={() => {
+                    clearAuthError();
+                    void signIn(
+                      "github",
+                      signInRedirectTo ? { redirectTo: signInRedirectTo } : undefined,
+                    ).catch((error) => {
+                      setAuthError(
+                        getUserFacingConvexError(error, "Sign in failed. Please try again."),
+                      );
+                    });
+                  }}
+                >
+                  <span className="sign-in-label">Sign in</span>
+                  <span className="sign-in-provider">with GitHub</span>
+                </button>
+              )}
             </>
           )}
         </div>

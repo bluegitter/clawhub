@@ -1,7 +1,9 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { LocalSkillDetailPage } from "../../components/LocalSkillDetailPage";
 import { SkillDetailPage } from "../../components/SkillDetailPage";
 import { buildSkillMeta } from "../../lib/og";
 import { fetchSkillPageData } from "../../lib/skillPage";
+import { shouldUseLocalBackend } from "../../lib/localBackend";
 
 export const Route = createFileRoute("/$owner/$slug")({
   loader: async ({ params }) => {
@@ -23,6 +25,7 @@ export const Route = createFileRoute("/$owner/$slug")({
       summary: data?.summary ?? null,
       version: data?.version ?? null,
       initialData: data.initialData,
+      localData: data.localData,
     };
   },
   head: ({ params, loaderData }) => {
@@ -64,6 +67,9 @@ export const Route = createFileRoute("/$owner/$slug")({
 
 function OwnerSkill() {
   const { owner, slug } = Route.useParams();
-  const { initialData } = Route.useLoaderData();
-  return <SkillDetailPage slug={slug} canonicalOwner={owner} initialData={initialData} />;
+  const loaderData = Route.useLoaderData() as Awaited<ReturnType<typeof fetchSkillPageData>>;
+  if (shouldUseLocalBackend()) {
+    return <LocalSkillDetailPage slug={slug} canonicalOwner={owner} data={loaderData.localData} />;
+  }
+  return <SkillDetailPage slug={slug} canonicalOwner={owner} initialData={loaderData.initialData} />;
 }

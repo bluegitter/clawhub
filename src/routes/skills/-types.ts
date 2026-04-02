@@ -1,23 +1,24 @@
-import type { Doc } from "../../../convex/_generated/dataModel";
 import type { PublicPublisher, PublicSkill } from "../../lib/publicUser";
+
+export type SkillVersionSummary = {
+  version: string;
+  createdAt: number;
+  changelog: string;
+  changelogSource?: "auto" | "user" | null;
+  parsed?: {
+    clawdis?: {
+      os?: string[];
+      nix?: {
+        plugin?: boolean;
+        systems?: string[];
+      };
+    };
+  };
+};
 
 export type SkillListEntry = {
   skill: PublicSkill;
-  latestVersion: {
-    version: string;
-    createdAt: number;
-    changelog: string;
-    changelogSource?: "auto" | "user";
-    parsed?: {
-      clawdis?: {
-        os?: string[];
-        nix?: {
-          plugin?: boolean;
-          systems?: string[];
-        };
-      };
-    };
-  } | null;
+  latestVersion: SkillVersionSummary | null;
   ownerHandle?: string | null;
   owner?: PublicPublisher | null;
   searchScore?: number;
@@ -25,7 +26,7 @@ export type SkillListEntry = {
 
 export type SkillSearchEntry = {
   skill: PublicSkill;
-  version: Doc<"skillVersions"> | null;
+  version: SkillVersionSummary | null;
   score: number;
   ownerHandle?: string | null;
   owner?: PublicPublisher | null;

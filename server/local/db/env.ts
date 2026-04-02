@@ -1,0 +1,12 @@
+export const SSO_BASE_URL = process.env.SSO_BASE_URL ?? "http://192.168.63.22:8091";
+export const SSO_LOGIN_URL = process.env.SSO_LOGIN_URL ?? "http://192.168.63.22:8091/login";
+export const SSO_LOGOUT_URL = process.env.SSO_LOGOUT_URL ?? "http://192.168.63.22:8091/logout";
+export const SSO_APP_KEY = process.env.SSO_APP_KEY ?? "skillhub";
+export const SSO_APP_SECRET = process.env.SSO_APP_SECRET ?? "";
+export const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
+export const STORAGE_ROOT = process.env.STORAGE_ROOT ?? "data/storage";
+export const OPENAI_API_KEY = process.env.OPENAI_API_KEY ?? "";
+export const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+export const DEFAULT_PAGE_SIZE = 20;
+export const LOCAL_AUTH_ENABLED = process.env.LOCAL_AUTH_ENABLED !== "0";
+export const SSO_ENABLED = process.env.SSO_ENABLED !== "0";
