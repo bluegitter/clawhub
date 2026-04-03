@@ -425,9 +425,9 @@ const zh: Record<MessageKey, string> = {
   "site.clawhub.description": "ClawHub：面向智能体的快速技能注册表，支持向量搜索。",
   "site.soulhub.description": "SoulHub：集中托管 SOUL.md 包和个人系统知识的地方。",
   "home.skills.badge": "轻量外壳，面向 Agent。",
-  "home.skills.title": "ClawHub，给聪明代理用的技能中心。",
+  "home.skills.title": "ClawHub，给高效Agent用的技能中心。",
   "home.skills.subtitle":
-    "上传 AgentSkills 包，像 npm 一样管理版本，再用向量搜索快速发现。没有门槛，只有有效信号。",
+    "上传 AgentSkills 包，像 npm 一样管理版本，再用向量搜索快速发现。不设门槛，让价值自己说话。",
   "home.skills.publish": "发布技能",
   "home.skills.browse": "浏览技能",
   "home.skills.searchStat": "搜索技能，支持版本管理和回滚。",
