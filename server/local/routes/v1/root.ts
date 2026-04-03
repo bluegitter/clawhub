@@ -3,8 +3,7 @@ import { requireAuth, optionalAuth } from "../../middleware/auth";
 import { getDb } from "../../db/index";
 import { skills, stars, users } from "../../db/schema/index";
 import { searchSkills } from "../../services/search";
-import { getSkillStatsMap, resolveSkillVersion } from "../../services/skill";
-import { readAllVersionFiles } from "../../storage/index";
+import { getSkillStatsMap, getVersionArchive, resolveSkillVersion } from "../../services/skill";
 import { buildDeterministicZip } from "../../services/zipBuilder";
 import type { AuthVariables } from "../../middleware/auth";
 import { and, desc, eq } from "drizzle-orm";
@@ -71,15 +70,15 @@ app.get("/download", optionalAuth, async (c) => {
   if (!version) return c.json({ error: "version is required" }, 400);
 
   try {
-    const files = await readAllVersionFiles(slug, version);
-    if (files.length === 0) return c.json({ error: "No files" }, 404);
+    const archive = await getVersionArchive(slug, version);
+    if (!archive || archive.files.length === 0) return c.json({ error: "No files" }, 404);
     const zip = buildDeterministicZip(
-      files.map((f) => ({ name: f.filename, data: new Uint8Array(f.data) })),
+      archive.files.map((f) => ({ name: f.filename, data: new Uint8Array(f.data) })),
     );
     return new Response(toResponseBody(zip), {
       headers: {
         "Content-Type": "application/zip",
-        "Content-Disposition": `attachment; filename="${slug}-${version}.zip"`,
+        "Content-Disposition": `attachment; filename="${archive.slug}-${version}.zip"`,
       },
     });
   } catch (err) {

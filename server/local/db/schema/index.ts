@@ -2,6 +2,8 @@ export { users } from "./users";
 export { skills, skillsRelations } from "./skills";
 export { skillVersions, skillVersionsRelations } from "./skillVersions";
 export { skillFiles, skillFilesRelations } from "./skillFiles";
+export { skillVersionTags, skillVersionTagsRelations } from "./skillVersionTags";
+export { skillAliases, skillAliasesRelations } from "./skillAliases";
 export { skillEmbeddings } from "./skillEmbeddings";
 export { sessions } from "./sessions";
 export { apiTokens } from "./apiTokens";

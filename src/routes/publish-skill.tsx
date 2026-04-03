@@ -101,6 +101,7 @@ export function Upload() {
       }>
     | undefined;
   const [ownerHandle, setOwnerHandle] = useState("");
+  const [localExistingSlug, setLocalExistingSlug] = useState<string | null>(updateSlug ?? null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const setFileInputRef = (node: HTMLInputElement | null) => {
@@ -191,13 +192,23 @@ export function Upload() {
     | undefined
   >(undefined);
   const slugCollision = useMemo(
-    () =>
-      getPublicSlugCollision({
+    () => {
+      const collision = getPublicSlugCollision({
         isSoulMode,
         slug: trimmedSlug,
         result: useLocalBackend ? localSlugAvailability : slugAvailability,
-      }),
-    [isSoulMode, localSlugAvailability, slugAvailability, trimmedSlug, useLocalBackend],
+      });
+      if (
+        useLocalBackend &&
+        collision &&
+        localExistingSlug &&
+        trimmedSlug.toLowerCase() === localExistingSlug.trim().toLowerCase()
+      ) {
+        return null;
+      }
+      return collision;
+    },
+    [isSoulMode, localExistingSlug, localSlugAvailability, slugAvailability, trimmedSlug, useLocalBackend],
   );
 
   useEffect(() => {
@@ -217,6 +228,7 @@ export function Upload() {
       .then((result) => {
         if (cancelled || !result?.skill) return;
         setSlug(result.skill.slug);
+        setLocalExistingSlug(result.skill.slug);
         setDisplayName(result.skill.displayName);
         const nextVersion = result.version && semver.valid(result.version)
           ? semver.inc(result.version, "patch")
@@ -227,6 +239,15 @@ export function Upload() {
     return () => {
       cancelled = true;
     };
+  }, [updateSlug, useLocalBackend]);
+
+  useEffect(() => {
+    if (!useLocalBackend) return;
+    if (!updateSlug) {
+      setLocalExistingSlug(null);
+      return;
+    }
+    setLocalExistingSlug((current) => current ?? updateSlug);
   }, [updateSlug, useLocalBackend]);
 
   useEffect(() => {

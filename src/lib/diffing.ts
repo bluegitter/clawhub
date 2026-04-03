@@ -59,10 +59,17 @@ export function getDefaultDiffSelection<IdType extends string>(
   tags?: TagMap<IdType>,
 ) {
   const latestId = resolveLatestVersionId(versions, tags);
+  const stableId = tags?.stable ?? null;
+  const betaId = tags?.beta ?? null;
   const previousId = resolvePreviousVersionId(versions, latestId);
+  const baselineId =
+    (stableId && stableId !== latestId ? stableId : null) ??
+    (previousId && previousId !== latestId ? previousId : null) ??
+    (betaId && betaId !== latestId ? betaId : null) ??
+    previousId;
   return {
-    leftId: previousId ?? latestId ?? null,
-    rightId: latestId ?? previousId ?? null,
+    leftId: baselineId ?? latestId ?? null,
+    rightId: latestId ?? baselineId ?? null,
   };
 }
 

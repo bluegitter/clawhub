@@ -8,10 +8,14 @@ import {
   checkSlugAvailability,
   publishSkill,
   deleteSkill,
+  deleteSkillVersion,
+  renameSkill,
+  setSkillVersionTags,
   getFileForVersion,
+  getVersionArchive,
 } from "../../services/skill";
 import { DEFAULT_PAGE_SIZE } from "../../db/env";
-import { getFile, readAllVersionFiles } from "../../storage/index";
+import { getFile } from "../../storage/index";
 import { buildDeterministicZip } from "../../services/zipBuilder";
 import type { AuthVariables } from "../../middleware/auth";
 
@@ -62,16 +66,16 @@ app.get("/:slug/versions/:version/download", optionalAuth, async (c) => {
   const slug = c.req.param("slug");
   const version = c.req.param("version");
   try {
-    const files = await readAllVersionFiles(slug, version);
-    if (files.length === 0) return c.json({ error: "No files" }, 404);
+    const archive = await getVersionArchive(slug, version);
+    if (!archive || archive.files.length === 0) return c.json({ error: "No files" }, 404);
 
     const zip = buildDeterministicZip(
-      files.map((f) => ({ name: f.filename, data: new Uint8Array(f.data) })),
+      archive.files.map((f) => ({ name: f.filename, data: new Uint8Array(f.data) })),
     );
     return new Response(toResponseBody(zip), {
       headers: {
         "Content-Type": "application/zip",
-        "Content-Disposition": `attachment; filename="${slug}-${version}.zip"`,
+        "Content-Disposition": `attachment; filename="${archive.slug}-${version}.zip"`,
       },
     });
   } catch (err) {
@@ -181,6 +185,31 @@ app.post("/", requireAuth, async (c) => {
   }
 });
 
+app.put("/:slug/rename", requireAuth, async (c) => {
+  const user = c.get("user");
+  const slug = c.req.param("slug");
+  let body: { newSlug?: string };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
+
+  try {
+    const result = await renameSkill(user, slug, body.newSlug ?? "");
+    return c.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Rename failed";
+    const status =
+      message === "Skill not found"
+        ? 404
+        : message === "You do not own this skill"
+          ? 403
+          : 400;
+    return c.json({ error: message }, status);
+  }
+});
+
 app.delete("/:slug", requireAuth, async (c) => {
   const user = c.get("user");
   const slug = c.req.param("slug");
@@ -190,6 +219,51 @@ app.delete("/:slug", requireAuth, async (c) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Delete failed";
     const status = message === "Skill not found" ? 404 : message === "You do not own this skill" ? 403 : 400;
+    return c.json({ error: message }, status);
+  }
+});
+
+app.delete("/:slug/versions/:version", requireAuth, async (c) => {
+  const user = c.get("user");
+  const slug = c.req.param("slug");
+  const version = c.req.param("version");
+  try {
+    await deleteSkillVersion(user, slug, version);
+    return c.json({ ok: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Delete failed";
+    const status =
+      message === "Skill not found" || message === "Skill version not found"
+        ? 404
+        : message === "You do not own this skill"
+          ? 403
+          : 400;
+    return c.json({ error: message }, status);
+  }
+});
+
+app.put("/:slug/versions/:version/tags", requireAuth, async (c) => {
+  const user = c.get("user");
+  const slug = c.req.param("slug");
+  const version = c.req.param("version");
+  let body: { tags?: string[] };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
+
+  try {
+    const result = await setSkillVersionTags(user, slug, version, Array.isArray(body.tags) ? body.tags : []);
+    return c.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Update tags failed";
+    const status =
+      message === "Skill not found" || message === "Skill version not found"
+        ? 404
+        : message === "You do not own this skill"
+          ? 403
+          : 400;
     return c.json({ error: message }, status);
   }
 });

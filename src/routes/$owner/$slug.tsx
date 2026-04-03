@@ -9,12 +9,19 @@ export const Route = createFileRoute("/$owner/$slug")({
   loader: async ({ params }) => {
     const data = await fetchSkillPageData(params.slug);
     const canonicalOwner = data.initialData?.result?.owner?.handle ?? null;
-    const canonicalSlug = data.initialData?.result?.resolvedSlug ?? params.slug;
+    const canonicalSlug = data.initialData?.result?.resolvedSlug ?? data.localData?.resolvedSlug ?? params.slug;
 
     if (canonicalOwner && (canonicalOwner !== params.owner || canonicalSlug !== params.slug)) {
       throw redirect({
         to: "/$owner/$slug",
         params: { owner: canonicalOwner, slug: canonicalSlug },
+        replace: true,
+      });
+    }
+    if (!canonicalOwner && data.localData?.resolvedSlug && data.localData.resolvedSlug !== params.slug) {
+      throw redirect({
+        to: "/$owner/$slug",
+        params: { owner: params.owner, slug: data.localData.resolvedSlug },
         replace: true,
       });
     }

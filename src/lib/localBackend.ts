@@ -46,20 +46,27 @@ type LocalSkillResponse = {
     createdAt: number;
     changelog: string;
     license: "MIT-0" | null;
+    fileCount?: number;
+    fileSize?: number;
   } | null;
   owner: {
     handle: string | null;
     displayName: string | null;
     image: string | null;
   } | null;
+  requestedSlug?: string | null;
+  resolvedSlug?: string | null;
 };
 
 type LocalVersionListResponse = {
   items: Array<{
+    id?: string;
     version: string;
     createdAt: number;
     changelog: string;
     changelogSource: "auto" | "user" | null;
+    fileCount?: number;
+    fileSize?: number;
   }>;
   nextCursor: string | null;
 };
@@ -71,6 +78,8 @@ type LocalVersionDetailResponse = {
     changelog: string;
     changelogSource: "auto" | "user" | null;
     license: "MIT-0" | null;
+    fileCount?: number;
+    fileSize?: number;
     files?: Array<{
       path: string;
       size: number;
@@ -170,6 +179,8 @@ type LocalStarsResponse = {
 export type LocalAuthUser = Doc<"users">;
 
 export type LocalSkillDetailData = {
+  requestedSlug: string | null;
+  resolvedSlug: string | null;
   owner: string | null;
   displayName: string | null;
   summary: string | null;
@@ -177,10 +188,13 @@ export type LocalSkillDetailData = {
   skill: PublicSkill | null;
   ownerProfile: PublicPublisher | null;
   latestVersion: {
+    id: string;
     version: string;
     createdAt: number;
     changelog: string;
     changelogSource?: "auto" | "user" | null;
+    fileCount: number;
+    fileSize: number;
     files: Array<{
       path: string;
       size: number;
@@ -189,10 +203,13 @@ export type LocalSkillDetailData = {
     }>;
   } | null;
   versions: Array<{
+    id: string;
     version: string;
     createdAt: number;
     changelog: string;
     changelogSource?: "auto" | "user" | null;
+    fileCount: number;
+    fileSize: number;
   }>;
   readme: string | null;
   readmeError: string | null;
@@ -284,10 +301,13 @@ export async function fetchLocalSkillDetail(slug: string): Promise<LocalSkillDet
       const latest = (await latestVersionResponse.json()) as LocalVersionDetailResponse;
       if (latest.version) {
         latestVersion = {
+          id: `${slug}:${latest.version.version}`,
           version: latest.version.version,
           createdAt: latest.version.createdAt,
           changelog: latest.version.changelog,
           changelogSource: latest.version.changelogSource,
+          fileCount: latest.version.fileCount ?? latest.version.files?.length ?? 0,
+          fileSize: latest.version.fileSize ?? 0,
           files: latest.version.files ?? [],
         };
       }
@@ -330,6 +350,8 @@ export async function fetchLocalSkillDetail(slug: string): Promise<LocalSkillDet
     : null;
 
   return {
+    requestedSlug: detail.requestedSlug ?? slug,
+    resolvedSlug: detail.resolvedSlug ?? detail.skill.slug,
     owner: detail.owner?.handle ?? detail.owner?.displayName ?? null,
     displayName: detail.skill.displayName,
     summary: detail.skill.summary,
@@ -338,13 +360,39 @@ export async function fetchLocalSkillDetail(slug: string): Promise<LocalSkillDet
     ownerProfile,
     latestVersion,
     versions: versions.items.map((entry) => ({
+      id: entry.id ?? `${slug}:${entry.version}`,
       version: entry.version,
       createdAt: entry.createdAt,
       changelog: entry.changelog,
       changelogSource: entry.changelogSource,
+      fileCount: entry.fileCount ?? 0,
+      fileSize: entry.fileSize ?? 0,
     })),
     readme,
     readmeError,
+  };
+}
+
+export async function fetchLocalVersionDetail(slug: string, version: string) {
+  const backend = requireLocalBackendOrigin();
+  const url = new URL(
+    `/api/v1/skills/${encodeURIComponent(slug)}/versions/${encodeURIComponent(version)}`,
+    backend,
+  );
+  const response = await fetch(url.toString());
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`Failed to load version (${response.status})`);
+  const detail = (await response.json()) as LocalVersionDetailResponse;
+  if (!detail.version) return null;
+  return {
+    id: `${slug}:${detail.version.version}`,
+    version: detail.version.version,
+    createdAt: detail.version.createdAt,
+    changelog: detail.version.changelog,
+    changelogSource: detail.version.changelogSource,
+    fileCount: detail.version.fileCount ?? detail.version.files?.length ?? 0,
+    fileSize: detail.version.fileSize ?? 0,
+    files: detail.version.files ?? [],
   };
 }
 
@@ -574,6 +622,64 @@ export async function deleteLocalSkill(slug: string) {
     const data = (await response.json().catch(() => ({}))) as { error?: string };
     throw new Error(data.error || `Delete failed (${response.status})`);
   }
+}
+
+export async function deleteLocalSkillVersion(slug: string, version: string) {
+  const backend = requireLocalBackendOrigin();
+  const response = await fetch(
+    new URL(`/api/v1/skills/${encodeURIComponent(slug)}/versions/${encodeURIComponent(version)}`, backend).toString(),
+    {
+      method: "DELETE",
+      credentials: "include",
+      headers: buildLocalAuthHeaders(),
+    },
+  );
+  if (!response.ok) {
+    const data = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(data.error || `Delete failed (${response.status})`);
+  }
+}
+
+export async function setLocalSkillVersionTags(slug: string, version: string, tags: string[]) {
+  const backend = requireLocalBackendOrigin();
+  const response = await fetch(
+    new URL(`/api/v1/skills/${encodeURIComponent(slug)}/versions/${encodeURIComponent(version)}/tags`, backend).toString(),
+    {
+      method: "PUT",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...buildLocalAuthHeaders(),
+      },
+      body: JSON.stringify({ tags }),
+    },
+  );
+  if (!response.ok) {
+    const data = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(data.error || `Update tags failed (${response.status})`);
+  }
+  return (await response.json()) as { ok: true; tags: Record<string, string> };
+}
+
+export async function renameLocalSkill(slug: string, newSlug: string) {
+  const backend = requireLocalBackendOrigin();
+  const response = await fetch(
+    new URL(`/api/v1/skills/${encodeURIComponent(slug)}/rename`, backend).toString(),
+    {
+      method: "PUT",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...buildLocalAuthHeaders(),
+      },
+      body: JSON.stringify({ newSlug }),
+    },
+  );
+  if (!response.ok) {
+    const data = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(data.error || `Rename failed (${response.status})`);
+  }
+  return (await response.json()) as { ok: true; previousSlug: string; slug: string };
 }
 
 function requireLocalBackendOrigin() {

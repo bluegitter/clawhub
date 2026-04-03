@@ -2974,7 +2974,34 @@ code {
 
 .version-actions {
   display: grid;
+  gap: 8px;
   align-items: center;
+}
+
+.version-tag-editor {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.version-tag-editor-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.version-meta-inline {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+
+.version-shortcuts {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .version-zip {
