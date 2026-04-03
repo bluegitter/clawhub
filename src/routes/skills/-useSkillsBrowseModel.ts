@@ -1,8 +1,5 @@
-import { useAction } from "convex/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { api } from "../../../convex/_generated/api";
-import { convexHttp } from "../../convex/client";
-import { fetchLocalSkillsList, shouldUseLocalBackend } from "../../lib/localBackend";
+import { fetchLocalSkillsList } from "../../lib/localBackend";
 import { parseDir, parseSort, toListSort, type SortDir, type SortKey } from "./-params";
 import type { SkillListEntry, SkillSearchEntry } from "./-types";
 
@@ -48,9 +45,6 @@ export function useSkillsBrowseModel({
   const view: SkillsView = search.view ?? "list";
   const highlightedOnly = search.highlighted ?? false;
   const nonSuspiciousOnly = search.nonSuspicious ?? false;
-  const searchSkills = useAction(api.search.searchSkills);
-  const useLocalBackend = shouldUseLocalBackend();
-
   const trimmedQuery = useMemo(() => query.trim(), [query]);
   const hasQuery = trimmedQuery.length > 0;
   const sort: SortKey =
@@ -75,25 +69,12 @@ export function useSkillsBrowseModel({
         let page: SkillListEntry[];
         let nextCursor: string | null;
 
-        if (useLocalBackend) {
-          const result = await fetchLocalSkillsList({
-            cursor,
-            limit: pageSize,
-          });
-          page = result.items as SkillListEntry[];
-          nextCursor = result.nextCursor;
-        } else {
-          const result = await convexHttp.query(api.skills.listPublicPageV4, {
-            cursor: cursor ?? undefined,
-            numItems: pageSize,
-            sort: listSort,
-            dir,
-            highlightedOnly,
-            nonSuspiciousOnly,
-          });
-          page = result.page;
-          nextCursor = result.nextCursor;
-        }
+        const result = await fetchLocalSkillsList({
+          cursor,
+          limit: pageSize,
+        });
+        page = result.items as SkillListEntry[];
+        nextCursor = result.nextCursor;
         if (generation !== fetchGeneration.current) return;
         const canAdvance = nextCursor != null;
         setListResults((prev) => (cursor ? [...prev, ...page] : page));
@@ -106,7 +87,7 @@ export function useSkillsBrowseModel({
         setListStatus(cursor ? "idle" : "done");
       }
     },
-    [dir, highlightedOnly, listSort, nonSuspiciousOnly, useLocalBackend],
+    [dir, highlightedOnly, listSort, nonSuspiciousOnly],
   );
 
   // Reset and fetch first page when sort/dir/filters change
@@ -154,23 +135,16 @@ export function useSkillsBrowseModel({
     const handle = window.setTimeout(() => {
       void (async () => {
         try {
-          const data = useLocalBackend
-            ? (await fetchLocalSkillsList({
-                query: trimmedQuery,
-                limit: searchLimit,
-              })).items.map((entry) => ({
-                skill: entry.skill,
-                version: entry.latestVersion,
-                score: entry.searchScore ?? 1,
-                ownerHandle: entry.ownerHandle ?? null,
-                owner: entry.owner ?? null,
-              }))
-            : ((await searchSkills({
-                query: trimmedQuery,
-                highlightedOnly,
-                nonSuspiciousOnly,
-                limit: searchLimit,
-              })) as Array<SkillSearchEntry>);
+          const data = (await fetchLocalSkillsList({
+            query: trimmedQuery,
+            limit: searchLimit,
+          })).items.map((entry) => ({
+            skill: entry.skill,
+            version: entry.latestVersion,
+            score: entry.searchScore ?? 1,
+            ownerHandle: entry.ownerHandle ?? null,
+            owner: entry.owner ?? null,
+          })) as Array<SkillSearchEntry>;
           if (requestId === searchRequest.current) {
             setSearchResults(data);
           }
@@ -187,9 +161,7 @@ export function useSkillsBrowseModel({
     highlightedOnly,
     nonSuspiciousOnly,
     searchLimit,
-    searchSkills,
     trimmedQuery,
-    useLocalBackend,
   ]);
 
   const baseItems = useMemo(() => {

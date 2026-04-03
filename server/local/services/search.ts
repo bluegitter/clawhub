@@ -1,6 +1,6 @@
 import { eq, desc, sql } from "drizzle-orm";
 import { getDb } from "../db/index";
-import { skills, skillEmbeddings } from "../db/schema/index";
+import { skills, skillEmbeddings, users } from "../db/schema/index";
 import { OPENAI_API_KEY } from "../db/env";
 
 export async function searchSkills(query: string, limit: number) {
@@ -16,8 +16,12 @@ export async function searchSkills(query: string, limit: number) {
         latestVersion: skills.latestVersion,
         tags: skills.tags,
         updatedAt: skills.updatedAt,
+        ownerHandle: users.username,
+        ownerDisplayName: users.realName,
+        ownerImage: users.image,
       })
       .from(skills)
+      .innerJoin(users, eq(skills.ownerId, users.id))
       .where(eq(skills.visibility, "public"))
       .orderBy(desc(skills.updatedAt))
       .limit(limit);
@@ -47,8 +51,12 @@ async function lexicalSearch(query: string, limit: number) {
       latestVersion: skills.latestVersion,
       tags: skills.tags,
       updatedAt: skills.updatedAt,
+      ownerHandle: users.username,
+      ownerDisplayName: users.realName,
+      ownerImage: users.image,
     })
     .from(skills)
+    .innerJoin(users, eq(skills.ownerId, users.id))
     .where(eq(skills.visibility, "public"))
     .orderBy(desc(skills.updatedAt));
 
@@ -76,6 +84,9 @@ async function lexicalSearch(query: string, limit: number) {
         latestVersion: row.latestVersion,
         tags: row.tags,
         updatedAt: row.updatedAt,
+        ownerHandle: row.ownerHandle,
+        ownerDisplayName: row.ownerDisplayName,
+        ownerImage: row.ownerImage,
         score,
       };
     })
@@ -102,14 +113,19 @@ async function vectorSearch(query: string, limit: number) {
     latest_version: string | null;
     tags: string[] | null;
     updated_at: Date;
+    owner_handle: string | null;
+    owner_display_name: string | null;
+    owner_image: string | null;
     distance: number;
   };
   const vecStr = JSON.stringify(embedding);
   const result = await db.execute<VectorRow>(sql`
     SELECT s.id, s.slug, s.name, s.summary, s.latest_version, s.tags, s.updated_at,
+      u.username as owner_handle, u.real_name as owner_display_name, u.image as owner_image,
       se.embedding <=> ${vecStr}::vector AS distance
     FROM skills s
     JOIN skill_embeddings se ON se.skill_id = s.id
+    JOIN users u ON u.id = s.owner_id
     WHERE s.visibility = 'public'
     ORDER BY se.embedding <=> ${vecStr}::vector
     LIMIT ${limit}
@@ -127,6 +143,12 @@ interface SearchHit {
   tags?: string[] | null;
   updatedAt?: Date | null;
   updated_at?: Date;
+  ownerHandle?: string | null;
+  owner_handle?: string | null;
+  ownerDisplayName?: string | null;
+  owner_display_name?: string | null;
+  ownerImage?: string | null;
+  owner_image?: string | null;
   rank?: number;
   distance?: number;
   score?: number;
@@ -142,6 +164,9 @@ function mergeSearchResults(fulltext: SearchHit[], vector: SearchHit[], limit: n
     latestVersion: string | null;
     tags: string[] | null;
     updatedAt: Date | null;
+    ownerHandle: string | null;
+    ownerDisplayName: string | null;
+    ownerImage: string | null;
     score: number;
   }> = [];
 
@@ -156,6 +181,9 @@ function mergeSearchResults(fulltext: SearchHit[], vector: SearchHit[], limit: n
         latestVersion: row.latestVersion ?? row.latest_version ?? null,
         tags: row.tags ?? null,
         updatedAt: row.updatedAt ?? row.updated_at ?? null,
+        ownerHandle: row.ownerHandle ?? row.owner_handle ?? null,
+        ownerDisplayName: row.ownerDisplayName ?? row.owner_display_name ?? null,
+        ownerImage: row.ownerImage ?? row.owner_image ?? null,
         score: row.score ?? row.rank ?? 0,
       });
     }
@@ -172,6 +200,9 @@ function mergeSearchResults(fulltext: SearchHit[], vector: SearchHit[], limit: n
         latestVersion: row.latest_version ?? null,
         tags: row.tags ?? null,
         updatedAt: row.updated_at ?? null,
+        ownerHandle: row.ownerHandle ?? row.owner_handle ?? null,
+        ownerDisplayName: row.ownerDisplayName ?? row.owner_display_name ?? null,
+        ownerImage: row.ownerImage ?? row.owner_image ?? null,
         score: 1 / (1 + (row.distance ?? 1)),
       });
     }

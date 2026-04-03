@@ -3,7 +3,7 @@ import type { PublicSkill } from "./publicUser";
 
 type User = Doc<"users"> | null | undefined;
 
-type Skill = PublicSkill | null | undefined;
+type Skill = Doc<"skills"> | PublicSkill | null | undefined;
 
 export function isAdmin(user: User) {
   return user?.role === "admin";

@@ -1,4 +1,4 @@
-import { useAction } from "convex/react";
+import { useAction } from "../lib/convexCompat";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -24,12 +24,12 @@ export function SkillFilesPanel({
   const getFileText = useAction(api.skills.getFileText);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
-  const [fileMeta, setFileMeta] = useState<{ size: number; sha256: string } | null>(null);
+  const [fileMeta, setFileMeta] = useState<{ size: number; sha256: string | null } | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const isMounted = useRef(true);
   const requestId = useRef(0);
-  const fileCache = useRef(new Map<string, { text: string; size: number; sha256: string }>());
+  const fileCache = useRef(new Map<string, { text: string; size: number; sha256: string | null }>());
 
   useEffect(() => {
     isMounted.current = true;
@@ -72,7 +72,7 @@ export function SkillFilesPanel({
       setFileMeta(null);
       setIsLoading(true);
       void getFileText({ versionId, path })
-        .then((data) => {
+        .then((data: { text: string; size: number; sha256: string | null }) => {
           if (!isMounted.current) return;
           if (requestId.current !== current) return;
           fileCache.current.set(cacheKey, data);
@@ -80,7 +80,7 @@ export function SkillFilesPanel({
           setFileMeta({ size: data.size, sha256: data.sha256 });
           setIsLoading(false);
         })
-        .catch((error) => {
+        .catch((error: unknown) => {
           if (!isMounted.current) return;
           if (requestId.current !== current) return;
           setFileError(error instanceof Error ? error.message : "Failed to load file");
@@ -142,7 +142,7 @@ export function SkillFilesPanel({
             <div className="file-path">{selectedPath ?? "Select a file"}</div>
             {fileMeta ? (
               <span className="file-meta">
-                {formatBytes(fileMeta.size)} · {fileMeta.sha256.slice(0, 12)}…
+                {formatBytes(fileMeta.size)} · {(fileMeta.sha256 ?? "unknown").slice(0, 12)}…
               </span>
             ) : null}
           </div>

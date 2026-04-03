@@ -1,4 +1,4 @@
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "../lib/convexCompat";
 import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -94,11 +94,11 @@ export function SoulDetailPage({ slug }: SoulDetailPageProps) {
     setReadmeError(null);
     let cancelled = false;
     void getReadme({ versionId: latestVersion._id })
-      .then((data) => {
+      .then((data: { text: string }) => {
         if (cancelled) return;
         setReadme(data.text);
       })
-      .catch((error) => {
+      .catch((error: unknown) => {
         if (cancelled) return;
         setReadmeError(error instanceof Error ? error.message : "Failed to load SOUL.md");
         setReadme(null);

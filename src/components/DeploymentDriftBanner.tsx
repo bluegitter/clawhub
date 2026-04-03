@@ -1,4 +1,4 @@
-import { useQueries } from "convex/react";
+import { useQueries } from "../lib/convexCompat";
 import { Component, useEffect, type ReactNode } from "react";
 import { api } from "../../convex/_generated/api";
 import { getDeploymentDriftInfo } from "../lib/deploymentDrift";

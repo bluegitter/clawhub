@@ -5,6 +5,8 @@ import { getPlatformLabels } from "../../components/skillDetailUtils";
 import { SkillMetricsRow, SkillStatsTripletLine } from "../../components/SkillStats";
 import { UserBadge } from "../../components/UserBadge";
 import { getSkillBadges } from "../../lib/badges";
+import { shouldUseLocalBackend } from "../../lib/localBackend";
+import { useLocalStars } from "../../lib/useLocalStars";
 import { buildSkillHref, type SkillListEntry } from "./-types";
 
 type SkillsResultsProps = {
@@ -32,6 +34,8 @@ export function SkillsResults({
   loadMoreRef,
   loadMore,
 }: SkillsResultsProps) {
+  const { isAuthenticated, starredSet, toggle } = useLocalStars();
+
   return (
     <>
       {isLoadingSkills ? (
@@ -73,6 +77,18 @@ export function SkillsResults({
                     </div>
                   </div>
                 }
+                extraActions={
+                  shouldUseLocalBackend() && isAuthenticated ? (
+                    <button
+                      className={`star-toggle${starredSet.has(skill.slug) ? " is-active" : ""}`}
+                      type="button"
+                      onClick={() => void toggle(skill.slug)}
+                      aria-label={starredSet.has(skill.slug) ? "Unstar skill" : "Star skill"}
+                    >
+                      <span aria-hidden="true">★</span>
+                    </button>
+                  ) : null
+                }
               />
             );
           })}
@@ -90,8 +106,8 @@ export function SkillsResults({
             const ownerHandle = entry.owner?.handle ?? entry.ownerHandle ?? null;
             const skillHref = buildSkillHref(skill, ownerHandle);
             return (
-              <Link key={skill._id} className="skills-table-row" to={skillHref}>
-                <span className="skills-table-name">
+              <div key={skill._id} className="skills-table-row">
+                <Link className="skills-table-name" to={skillHref}>
                   <span>
                     {skill.displayName}
                     {getSkillBadges(skill).map((badge) => (
@@ -101,7 +117,7 @@ export function SkillsResults({
                   {entry.latestVersion?.version ? (
                     <span className="skills-table-version">v{entry.latestVersion.version}</span>
                   ) : null}
-                </span>
+                </Link>
                 <span className="skills-table-summary">
                   {skill.summary ?? "No summary provided."}
                 </span>
@@ -115,8 +131,18 @@ export function SkillsResults({
                 </span>
                 <span className="skills-table-stats">
                   <SkillMetricsRow stats={skill.stats} />
+                  {shouldUseLocalBackend() && isAuthenticated ? (
+                    <button
+                      className={`star-toggle${starredSet.has(skill.slug) ? " is-active" : ""}`}
+                      type="button"
+                      onClick={() => void toggle(skill.slug)}
+                      aria-label={starredSet.has(skill.slug) ? "Unstar skill" : "Star skill"}
+                    >
+                      <span aria-hidden="true">★</span>
+                    </button>
+                  ) : null}
                 </span>
-              </Link>
+              </div>
             );
           })}
         </div>

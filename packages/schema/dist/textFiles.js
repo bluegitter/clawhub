@@ -32,6 +32,7 @@ const RAW_TEXT_FILE_EXTENSIONS = [
     "cfg",
     "env",
     "xml",
+    "xsd",
     "html",
     "css",
     "scss",

@@ -7,6 +7,7 @@ import {
   listSkillVersions,
   checkSlugAvailability,
   publishSkill,
+  deleteSkill,
   getFileForVersion,
 } from "../../services/skill";
 import { DEFAULT_PAGE_SIZE } from "../../db/env";
@@ -177,6 +178,19 @@ app.post("/", requireAuth, async (c) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Publish failed";
     return c.json({ error: message }, 400);
+  }
+});
+
+app.delete("/:slug", requireAuth, async (c) => {
+  const user = c.get("user");
+  const slug = c.req.param("slug");
+  try {
+    await deleteSkill(user, slug);
+    return c.json({ ok: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Delete failed";
+    const status = message === "Skill not found" ? 404 : message === "You do not own this skill" ? 403 : 400;
+    return c.json({ error: message }, status);
   }
 });
 

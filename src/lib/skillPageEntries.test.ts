@@ -10,6 +10,7 @@ function makeSkill(overrides: Partial<PublicSkill> = {}): PublicSkill {
     displayName: "Demo Skill",
     summary: "summary",
     ownerUserId: "users:1" as PublicSkill["ownerUserId"],
+    ownerPublisherId: undefined,
     canonicalSkillId: undefined,
     forkOf: undefined,
     latestVersionId: undefined,

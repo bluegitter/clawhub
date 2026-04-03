@@ -4,7 +4,7 @@ type BadgeKind = Doc<"skillBadges">["kind"];
 
 type SkillBadgeMap = Partial<Record<BadgeKind, { byUserId: Id<"users">; at: number }>>;
 
-type SkillLike = { badges?: SkillBadgeMap | null };
+type SkillLike = Record<string, any> & { badges?: SkillBadgeMap | null };
 
 type BadgeLabel = "Deprecated" | "Official" | "Highlighted";
 

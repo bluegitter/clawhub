@@ -1,6 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import type { ClawdisSkillMetadata } from "clawhub-schema";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "../lib/convexCompat";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
@@ -244,12 +244,12 @@ export function SkillDetailPage({
     let cancelled = false;
 
     void getReadme({ versionId: latestVersion._id })
-      .then((data) => {
+      .then((data: { text: string }) => {
         if (cancelled) return;
         setReadme(data.text);
         setLoadedReadmeVersionId(latestVersion._id);
       })
-      .catch((error) => {
+      .catch((error: unknown) => {
         if (cancelled) return;
         setReadmeError(error instanceof Error ? error.message : "Failed to load README");
         setReadme(null);

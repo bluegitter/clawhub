@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { SecurityScanResults } from "../../components/SkillSecurityScanResults";
+import { shouldUseLocalBackend } from "../../lib/localBackend";
 import {
   fetchPackageDetail,
   fetchPackageReadme,
@@ -20,6 +21,13 @@ type PluginDetailLoaderData = {
 
 export const Route = createFileRoute("/plugins/$name")({
   loader: async ({ params }): Promise<PluginDetailLoaderData> => {
+    if (shouldUseLocalBackend()) {
+      return {
+        detail: { package: null, owner: null },
+        version: null,
+        readme: null,
+      };
+    }
     const readmePromise = fetchPackageReadme(params.name);
     const detail = await fetchPackageDetail(params.name);
     const versionPromise = detail.package?.latestVersion
@@ -76,11 +84,16 @@ function VerifiedBadge() {
 function PluginDetailRoute() {
   const { name } = Route.useParams();
   const { detail, version, readme } = Route.useLoaderData() as PluginDetailLoaderData;
+  const useLocalBackend = shouldUseLocalBackend();
 
   if (!detail.package) {
     return (
       <main className="section">
-        <div className="card">Plugin not found.</div>
+        <div className="card">
+          {useLocalBackend
+            ? "Plugin detail pages have not been migrated to the local backend yet."
+            : "Plugin not found."}
+        </div>
       </main>
     );
   }

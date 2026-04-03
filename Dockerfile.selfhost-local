@@ -1,0 +1,70 @@
+FROM node:22-bookworm AS build
+
+WORKDIR /app
+
+ARG VITE_CONVEX_URL
+ARG VITE_CONVEX_SITE_URL
+ARG VITE_SITE_URL
+ARG SITE_URL
+ARG CONVEX_SITE_URL
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+ARG ALL_PROXY
+ARG NO_PROXY
+
+ENV VITE_CONVEX_URL=${VITE_CONVEX_URL}
+ENV VITE_CONVEX_SITE_URL=${VITE_CONVEX_SITE_URL}
+ENV VITE_SITE_URL=${VITE_SITE_URL}
+ENV SITE_URL=${SITE_URL}
+ENV CONVEX_SITE_URL=${CONVEX_SITE_URL}
+ENV HTTP_PROXY=${HTTP_PROXY}
+ENV HTTPS_PROXY=${HTTPS_PROXY}
+ENV ALL_PROXY=${ALL_PROXY}
+ENV NO_PROXY=${NO_PROXY}
+
+COPY package.json ./
+COPY packages/schema/package.json packages/schema/package.json
+COPY packages/clawdhub/package.json packages/clawdhub/package.json
+
+RUN npm install --ignore-scripts
+
+COPY . .
+
+RUN npx vite build && node --experimental-strip-types scripts/copy-og-assets.ts
+
+FROM node:22-bookworm
+
+WORKDIR /app
+
+ARG VITE_CONVEX_URL
+ARG VITE_CONVEX_SITE_URL
+ARG VITE_SITE_URL
+ARG SITE_URL
+ARG CONVEX_SITE_URL
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+ARG ALL_PROXY
+ARG NO_PROXY
+
+ENV VITE_CONVEX_URL=${VITE_CONVEX_URL}
+ENV VITE_CONVEX_SITE_URL=${VITE_CONVEX_SITE_URL}
+ENV VITE_SITE_URL=${VITE_SITE_URL}
+ENV SITE_URL=${SITE_URL}
+ENV CONVEX_SITE_URL=${CONVEX_SITE_URL}
+ENV HTTP_PROXY=${HTTP_PROXY}
+ENV HTTPS_PROXY=${HTTPS_PROXY}
+ENV ALL_PROXY=${ALL_PROXY}
+ENV NO_PROXY=${NO_PROXY}
+ENV HOST=0.0.0.0
+ENV PORT=8081
+
+COPY --from=build /app /app
+RUN mkdir -p /app/.convex-seed && \
+  cp -R /app/.convex/local /app/.convex-seed/local
+
+COPY scripts/start-selfhost-local.sh /usr/local/bin/start-selfhost-local.sh
+RUN chmod +x /usr/local/bin/start-selfhost-local.sh
+
+EXPOSE 8081 3210 3211
+
+CMD ["start-selfhost-local.sh"]

@@ -1,9 +1,17 @@
 import { Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { fetchLocalSkillFile, type LocalSkillDetailData } from "../lib/localBackend";
+import {
+  fetchLocalSkillFile,
+  getLocalStarStatus,
+  shouldUseLocalBackend,
+  toggleLocalStar,
+  type LocalSkillDetailData,
+} from "../lib/localBackend";
 import { getLocalBackendOrigin } from "../lib/runtimeEnv";
+import { useAuthStatus } from "../lib/useAuthStatus";
+import { stripFrontmatter } from "./skillDetailUtils";
 import { UserBadge } from "./UserBadge";
 
 type LocalSkillDetailPageProps = {
@@ -17,10 +25,13 @@ export function LocalSkillDetailPage({
   canonicalOwner,
   data,
 }: LocalSkillDetailPageProps) {
+  const { isAuthenticated } = useAuthStatus();
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [isLoadingFile, setIsLoadingFile] = useState(false);
+  const [isStarred, setIsStarred] = useState(false);
+  const [isUpdatingStar, setIsUpdatingStar] = useState(false);
   const backendOrigin = getLocalBackendOrigin() ?? "";
 
   const latestFiles = data?.latestVersion?.files ?? [];
@@ -32,6 +43,32 @@ export function LocalSkillDetailPage({
 
   const ownerLabel = canonicalOwner ?? data?.ownerProfile?.handle ?? data?.owner ?? null;
   const ownerProfile = useMemo(() => data?.ownerProfile ?? null, [data?.ownerProfile]);
+  const renderedReadme = useMemo(() => (data?.readme ? stripFrontmatter(data.readme) : null), [data?.readme]);
+  const [starCount, setStarCount] = useState(data?.skill?.stats.stars ?? 0);
+
+  useEffect(() => {
+    setStarCount(data?.skill?.stats.stars ?? 0);
+  }, [data?.skill?.stats.stars]);
+
+  useEffect(() => {
+    if (!shouldUseLocalBackend() || !isAuthenticated || !data?.skill) {
+      setIsStarred(false);
+      return;
+    }
+
+    let cancelled = false;
+    void getLocalStarStatus(data.skill.slug)
+      .then((result) => {
+        if (!cancelled) setIsStarred(result.starred);
+      })
+      .catch(() => {
+        if (!cancelled) setIsStarred(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [data?.skill, isAuthenticated]);
 
   if (!data?.skill) {
     return (
@@ -65,6 +102,18 @@ export function LocalSkillDetailPage({
     }
   };
 
+  const handleToggleStar = async () => {
+    if (!data?.skill || !isAuthenticated || isUpdatingStar) return;
+    setIsUpdatingStar(true);
+    try {
+      const result = await toggleLocalStar(data.skill.slug);
+      setIsStarred(result.starred);
+      setStarCount((current: number) => Math.max(0, current + (result.starred ? 1 : -1)));
+    } finally {
+      setIsUpdatingStar(false);
+    }
+  };
+
   return (
     <main className="section">
       <div className="card skill-hero">
@@ -86,14 +135,26 @@ export function LocalSkillDetailPage({
                   showName
                 />
               </div>
+              <div className="stat">★ {starCount} · ↓ {data.skill.stats.downloads}</div>
             </div>
-          </div>
-          <div className="skill-hero-actions">
-            {downloadHref ? (
-              <a className="btn btn-primary" href={downloadHref}>
-                Download latest
-              </a>
-            ) : null}
+            <div className="skill-hero-actions">
+              {downloadHref ? (
+                <a className="btn btn-primary" href={downloadHref}>
+                  Download latest
+                </a>
+              ) : null}
+              {isAuthenticated ? (
+                <button
+                  className={`star-toggle${isStarred ? " is-active" : ""}`}
+                  type="button"
+                  onClick={() => void handleToggleStar()}
+                  aria-label={isStarred ? "Unstar skill" : "Star skill"}
+                  disabled={isUpdatingStar}
+                >
+                  <span aria-hidden="true">★</span>
+                </button>
+              ) : null}
+            </div>
           </div>
         </div>
       </div>
@@ -106,7 +167,7 @@ export function LocalSkillDetailPage({
             </h2>
             <div className="markdown">
               {data.readme ? (
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{data.readme}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{renderedReadme ?? data.readme}</ReactMarkdown>
               ) : data.readmeError ? (
                 <div className="stat">{data.readmeError}</div>
               ) : (

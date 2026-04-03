@@ -10,6 +10,7 @@ type SkillCardProps = {
   summaryFallback: string;
   meta: ReactNode;
   href?: string;
+  extraActions?: ReactNode;
 };
 
 export function SkillCard({
@@ -20,6 +21,7 @@ export function SkillCard({
   summaryFallback,
   meta,
   href,
+  extraActions,
 }: SkillCardProps) {
   const owner = encodeURIComponent(String(skill.ownerUserId));
   const link = href ?? `/${owner}/${skill.slug}`;
@@ -27,7 +29,8 @@ export function SkillCard({
   const hasTags = badges.length || chip || platformLabels?.length;
 
   return (
-    <Link to={link} className="card skill-card">
+    <article className="card skill-card">
+      <Link to={link} className="skill-card-link">
       {hasTags ? (
         <div className="skill-card-tags">
           {badges.map((label) => (
@@ -45,7 +48,11 @@ export function SkillCard({
       ) : null}
       <h3 className="skill-card-title">{skill.displayName}</h3>
       <p className="skill-card-summary">{skill.summary ?? summaryFallback}</p>
-      <div className="skill-card-footer">{meta}</div>
-    </Link>
+      </Link>
+      <div className={`skill-card-footer${extraActions ? " skill-card-footer-inline" : ""}`}>
+        <div>{meta}</div>
+        {extraActions ? <div>{extraActions}</div> : null}
+      </div>
+    </article>
   );
 }

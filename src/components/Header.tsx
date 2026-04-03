@@ -1,16 +1,13 @@
-import { useAuthActions } from "@convex-dev/auth/react";
 import { Link } from "@tanstack/react-router";
 import { Menu, Monitor, Moon, Sun } from "lucide-react";
 import { useMemo, useRef } from "react";
-import { getUserFacingConvexError } from "../lib/convexError";
 import { gravatarUrl } from "../lib/gravatar";
 import { getLocalAuthLoginUrl, getLocalAuthLogoutUrl } from "../lib/localBackend";
 import { isModerator } from "../lib/roles";
-import { shouldUseLocalLogin } from "../lib/runtimeEnv";
 import { getClawHubSiteUrl, getSiteMode, getSiteName } from "../lib/site";
 import { applyTheme, useThemeMode } from "../lib/theme";
 import { startThemeTransition } from "../lib/theme-transition";
-import { setAuthError, useAuthError } from "../lib/useAuthError";
+import { useAuthError } from "../lib/useAuthError";
 import { useAuthStatus } from "../lib/useAuthStatus";
 import {
   DropdownMenu,
@@ -23,7 +20,6 @@ import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 
 export default function Header() {
   const { isAuthenticated, isLoading, me } = useAuthStatus();
-  const { signIn, signOut } = useAuthActions();
   const { mode, setMode } = useThemeMode();
   const toggleRef = useRef<HTMLDivElement | null>(null);
   const siteMode = getSiteMode();
@@ -36,13 +32,9 @@ export default function Header() {
   const initial = (me?.displayName ?? me?.name ?? handle).charAt(0).toUpperCase();
   const isStaff = isModerator(me);
   const { error: authError, clear: clearAuthError } = useAuthError();
-  const signInRedirectTo = getCurrentRelativeUrl();
-  const useLocalLogin = shouldUseLocalLogin();
-  const localLoginHref = useLocalLogin ? getLocalAuthLoginUrl() : null;
+  const localLoginHref = getLocalAuthLoginUrl("/");
   const localLogoutHref =
-    useLocalLogin && typeof window !== "undefined"
-      ? getLocalAuthLogoutUrl(`${window.location.origin}/`)
-      : null;
+    typeof window !== "undefined" ? getLocalAuthLogoutUrl(`${window.location.origin}/`) : null;
 
   const setTheme = (next: "system" | "light" | "dark") => {
     startThemeTransition({
@@ -60,9 +52,7 @@ export default function Header() {
   const handleSignOut = () => {
     if (localLogoutHref) {
       window.location.assign(localLogoutHref);
-      return;
     }
-    void signOut();
   };
 
   return (
@@ -320,41 +310,18 @@ export default function Header() {
                   </button>
                 </div>
               ) : null}
-              {useLocalLogin ? (
-                <a className="btn btn-primary" href={localLoginHref ?? "/login"}>
-                  <span className="sign-in-label">Sign in</span>
-                  <span className="sign-in-provider">with SSO</span>
-                </a>
-              ) : (
-                <button
-                  className="btn btn-primary"
-                  type="button"
-                  disabled={isLoading}
-                  onClick={() => {
-                    clearAuthError();
-                    void signIn(
-                      "github",
-                      signInRedirectTo ? { redirectTo: signInRedirectTo } : undefined,
-                    ).catch((error) => {
-                      setAuthError(
-                        getUserFacingConvexError(error, "Sign in failed. Please try again."),
-                      );
-                    });
-                  }}
-                >
-                  <span className="sign-in-label">Sign in</span>
-                  <span className="sign-in-provider">with GitHub</span>
-                </button>
-              )}
+              <a
+                className={`btn btn-primary${isLoading ? " is-disabled" : ""}`}
+                href={localLoginHref}
+                onClick={() => clearAuthError()}
+              >
+                <span className="sign-in-label">Sign in</span>
+                <span className="sign-in-provider">with SSO</span>
+              </a>
             </>
           )}
         </div>
       </div>
     </header>
   );
-}
-
-function getCurrentRelativeUrl() {
-  if (typeof window === "undefined") return "/";
-  return `${window.location.pathname}${window.location.search}${window.location.hash}`;
 }

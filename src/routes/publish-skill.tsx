@@ -4,19 +4,17 @@ import {
   PLATFORM_SKILL_LICENSE_NAME,
   PLATFORM_SKILL_LICENSE_SUMMARY,
 } from "clawhub-schema/licenseConstants";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "../lib/convexCompat";
 import { useEffect, useMemo, useRef, useState } from "react";
 import semver from "semver";
 import { api } from "../../convex/_generated/api";
 import {
-  MAX_PUBLISH_FILE_BYTES,
-  MAX_PUBLISH_TOTAL_BYTES,
-} from "../../convex/lib/publishLimits";
-import {
   checkLocalSlugAvailability,
+  fetchLocalSkillDetail,
   publishLocalSkill,
   shouldUseLocalBackend,
 } from "../lib/localBackend";
+import { MAX_PUBLISH_FILE_BYTES, MAX_PUBLISH_TOTAL_BYTES } from "../lib/publishLimits";
 import { getSiteMode } from "../lib/site";
 import { getPublicSlugCollision } from "../lib/slugCollision";
 import { expandDroppedItems, expandFilesWithReport } from "../lib/uploadFiles";
@@ -211,6 +209,25 @@ export function Upload() {
     const nextVersion = semver.inc(existing.latestVersion.version, "patch");
     if (nextVersion) setVersion(nextVersion);
   }, [existing]);
+
+  useEffect(() => {
+    if (!useLocalBackend || !updateSlug) return;
+    let cancelled = false;
+    void fetchLocalSkillDetail(updateSlug)
+      .then((result) => {
+        if (cancelled || !result?.skill) return;
+        setSlug(result.skill.slug);
+        setDisplayName(result.skill.displayName);
+        const nextVersion = result.version && semver.valid(result.version)
+          ? semver.inc(result.version, "patch")
+          : null;
+        if (nextVersion) setVersion(nextVersion);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [updateSlug, useLocalBackend]);
 
   useEffect(() => {
     if (ownerHandle) return;

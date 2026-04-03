@@ -1,18 +1,12 @@
-import { useConvexAuth, useQuery } from "convex/react";
 import { useEffect, useState } from "react";
-import { api } from "../../convex/_generated/api";
 import type { Doc } from "../../convex/_generated/dataModel";
 import {
   fetchLocalWhoAmI,
   getLocalSessionToken,
-  shouldUseLocalBackend,
   type LocalAuthUser,
 } from "./localBackend";
 
 export function useAuthStatus() {
-  const useLocalBackend = shouldUseLocalBackend();
-  const auth = useConvexAuth();
-  const me = useQuery(api.users.me, useLocalBackend ? "skip" : {}) as Doc<"users"> | null | undefined;
   const [localMe, setLocalMe] = useState<LocalAuthUser | null | undefined>(undefined);
   const [localSessionVersion, setLocalSessionVersion] = useState(0);
 
@@ -28,7 +22,6 @@ export function useAuthStatus() {
   }, []);
 
   useEffect(() => {
-    if (!useLocalBackend) return;
     if (!getLocalSessionToken()) {
       setLocalMe(null);
       return;
@@ -44,19 +37,11 @@ export function useAuthStatus() {
     return () => {
       cancelled = true;
     };
-  }, [localSessionVersion, useLocalBackend]);
-
-  if (useLocalBackend) {
-    return {
-      me: localMe,
-      isLoading: localMe === undefined,
-      isAuthenticated: Boolean(localMe),
-    };
-  }
+  }, [localSessionVersion]);
 
   return {
-    me,
-    isLoading: auth.isLoading,
-    isAuthenticated: auth.isAuthenticated,
+    me: localMe as Doc<"users"> | null | undefined,
+    isLoading: localMe === undefined,
+    isAuthenticated: Boolean(localMe),
   };
 }

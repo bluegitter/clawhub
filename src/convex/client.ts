@@ -1,8 +1,10 @@
-import { ConvexHttpClient } from "convex/browser";
-import { ConvexReactClient } from "convex/react";
-import { getRequiredRuntimeEnv } from "../lib/runtimeEnv";
+export const convex = {};
 
-const convexUrl = getRequiredRuntimeEnv("VITE_CONVEX_URL");
-
-export const convex = new ConvexReactClient(convexUrl);
-export const convexHttp = new ConvexHttpClient(convexUrl);
+export const convexHttp = {
+  query: async (..._args: any[]) => {
+    throw new Error("Convex client is unavailable in the local deployment.");
+  },
+  action: async (..._args: any[]) => {
+    throw new Error("Convex client is unavailable in the local deployment.");
+  },
+};

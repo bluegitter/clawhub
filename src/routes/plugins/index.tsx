@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { fetchPluginCatalog, type PackageListItem } from "../../lib/packageApi";
+import { shouldUseLocalBackend } from "../../lib/localBackend";
 import { familyLabel } from "../../lib/packageLabels";
 
 type PluginSearchState = {
@@ -38,6 +39,12 @@ export const Route = createFileRoute("/plugins/")({
   }),
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
+    if (shouldUseLocalBackend()) {
+      return {
+        items: [],
+        nextCursor: null,
+      } satisfies PluginsLoaderData;
+    }
     const data = await fetchPluginCatalog({
       q: deps.q,
       cursor: deps.q ? undefined : deps.cursor,
@@ -85,6 +92,7 @@ export function PluginsIndex() {
   const navigate = Route.useNavigate();
   const { items, nextCursor } = Route.useLoaderData() as PluginsLoaderData;
   const [query, setQuery] = useState(search.q ?? "");
+  const useLocalBackend = shouldUseLocalBackend();
 
   useEffect(() => {
     setQuery(search.q ?? "");
@@ -97,86 +105,18 @@ export function PluginsIndex() {
           Plugins
         </h1>
         <p className="section-subtitle" style={{ marginBottom: 0 }}>
-          Browse the plugin catalog.
+          {useLocalBackend
+            ? "Plugin catalog pages have not been migrated to the local backend yet."
+            : "Browse the plugin catalog."}
         </p>
       </header>
 
-      <form
-        className="skills-toolbar"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void navigate({
-            search: (prev) => ({
-              ...prev,
-              cursor: undefined,
-              q: query.trim() || undefined,
-            }),
-          });
-        }}
-      >
-        <div className="skills-search">
-          <input
-            className="skills-search-input"
-            placeholder="Search plugins…"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </div>
-        <div className="skills-toolbar-row">
-          <select
-            className="skills-sort"
-            value={search.family ?? ""}
-            onChange={(event) => {
-              const value = event.target.value as PluginSearchState["family"] | "";
-              void navigate({
-                search: (prev) => ({
-                  ...prev,
-                  cursor: undefined,
-                  q: query.trim() || undefined,
-                  family: value || undefined,
-                }),
-              });
-            }}
-            aria-label="Filter by type"
-          >
-            <option value="">All plugins</option>
-            <option value="code-plugin">Code plugins</option>
-            <option value="bundle-plugin">Bundle plugins</option>
-          </select>
-          <button
-            className="search-filter-button"
-            type="button"
-            aria-pressed={search.verified ?? false}
-            onClick={() => {
-              void navigate({
-                search: (prev) => ({
-                  ...prev,
-                  cursor: undefined,
-                  q: query.trim() || undefined,
-                  verified: prev.verified ? undefined : true,
-                }),
-              });
-            }}
-          >
-            Verified
-          </button>
-          <button
-            className="search-filter-button"
-            type="button"
-            aria-pressed={search.executesCode ?? false}
-            onClick={() => {
-              void navigate({
-                search: (prev) => ({
-                  ...prev,
-                  cursor: undefined,
-                  q: query.trim() || undefined,
-                  executesCode: prev.executesCode ? undefined : true,
-                }),
-              });
-            }}
-          >
-            Executes code
-          </button>
+      {useLocalBackend ? (
+        <div className="card">
+          <p className="section-subtitle" style={{ marginTop: 0 }}>
+            Local deployment currently supports skills. Plugin catalog browse and plugin detail APIs
+            still need dedicated local backend support.
+          </p>
           <Link
             className="btn btn-primary"
             to="/publish-plugin"
@@ -192,81 +132,176 @@ export function PluginsIndex() {
             Publish Plugin
           </Link>
         </div>
-      </form>
-
-      {items.length === 0 ? (
-        <div className="card">No plugins match that filter.</div>
       ) : (
         <>
-          <div className="grid">
-            {items.map((item) => (
-              <Link
-                key={item.name}
-                to="/plugins/$name"
-                params={{ name: item.name }}
-                className="card skill-card"
-              >
-                <div className="skill-card-tags">
-                  <span className="tag tag-compact">{familyLabel(item.family)}</span>
-                  {item.isOfficial ? (
-                    <span className="tag tag-compact tag-accent">
-                      <VerifiedBadge /> Verified
-                    </span>
-                  ) : null}
-                </div>
-                <h3 className="skill-card-title">{item.displayName}</h3>
-                <p className="skill-card-summary">
-                  {item.summary ?? "No summary provided."}
-                </p>
-                <div className="skill-card-footer" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span className="stat">
-                    {item.ownerHandle ? `by ${item.ownerHandle}` : "community"}
-                  </span>
-                  {item.latestVersion ? (
-                    <span className="stat">v{item.latestVersion}</span>
-                  ) : null}
-                </div>
-              </Link>
-            ))}
-          </div>
-          {!search.q && (search.cursor || nextCursor) ? (
-            <div
-              style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 22 }}
-            >
-              {search.cursor ? (
-                <button
-                  className="btn"
-                  type="button"
-                  onClick={() => {
-                    void navigate({
-                      search: (prev) => ({
-                        ...prev,
-                        cursor: undefined,
-                      }),
-                    });
-                  }}
-                >
-                  First page
-                </button>
-              ) : null}
-              {nextCursor ? (
-                <button
-                  className="btn btn-primary"
-                  type="button"
-                  onClick={() => {
-                    void navigate({
-                      search: (prev) => ({
-                        ...prev,
-                        cursor: nextCursor,
-                      }),
-                    });
-                  }}
-                >
-                  Next page
-                </button>
-              ) : null}
+          <form
+            className="skills-toolbar"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void navigate({
+                search: (prev) => ({
+                  ...prev,
+                  cursor: undefined,
+                  q: query.trim() || undefined,
+                }),
+              });
+            }}
+          >
+            <div className="skills-search">
+              <input
+                className="skills-search-input"
+                placeholder="Search plugins…"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
             </div>
-          ) : null}
+            <div className="skills-toolbar-row">
+              <select
+                className="skills-sort"
+                value={search.family ?? ""}
+                onChange={(event) => {
+                  const value = event.target.value as PluginSearchState["family"] | "";
+                  void navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      cursor: undefined,
+                      q: query.trim() || undefined,
+                      family: value || undefined,
+                    }),
+                  });
+                }}
+                aria-label="Filter by type"
+              >
+                <option value="">All plugins</option>
+                <option value="code-plugin">Code plugins</option>
+                <option value="bundle-plugin">Bundle plugins</option>
+              </select>
+              <button
+                className="search-filter-button"
+                type="button"
+                aria-pressed={search.verified ?? false}
+                onClick={() => {
+                  void navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      cursor: undefined,
+                      q: query.trim() || undefined,
+                      verified: prev.verified ? undefined : true,
+                    }),
+                  });
+                }}
+              >
+                Verified
+              </button>
+              <button
+                className="search-filter-button"
+                type="button"
+                aria-pressed={search.executesCode ?? false}
+                onClick={() => {
+                  void navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      cursor: undefined,
+                      q: query.trim() || undefined,
+                      executesCode: prev.executesCode ? undefined : true,
+                    }),
+                  });
+                }}
+              >
+                Executes code
+              </button>
+              <Link
+                className="btn btn-primary"
+                to="/publish-plugin"
+                search={{
+                  ownerHandle: undefined,
+                  name: undefined,
+                  displayName: undefined,
+                  family: undefined,
+                  nextVersion: undefined,
+                  sourceRepo: undefined,
+                }}
+              >
+                Publish Plugin
+              </Link>
+            </div>
+          </form>
+
+          {items.length === 0 ? (
+            <div className="card">No plugins match that filter.</div>
+          ) : (
+            <>
+              <div className="grid">
+                {items.map((item) => (
+                  <Link
+                    key={item.name}
+                    to="/plugins/$name"
+                    params={{ name: item.name }}
+                    className="card skill-card"
+                  >
+                    <div className="skill-card-tags">
+                      <span className="tag tag-compact">{familyLabel(item.family)}</span>
+                      {item.isOfficial ? (
+                        <span className="tag tag-compact tag-accent">
+                          <VerifiedBadge /> Verified
+                        </span>
+                      ) : null}
+                    </div>
+                    <h3 className="skill-card-title">{item.displayName}</h3>
+                    <p className="skill-card-summary">
+                      {item.summary ?? "No summary provided."}
+                    </p>
+                    <div className="skill-card-footer" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span className="stat">
+                        {item.ownerHandle ? `by ${item.ownerHandle}` : "community"}
+                      </span>
+                      {item.latestVersion ? (
+                        <span className="stat">v{item.latestVersion}</span>
+                      ) : null}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+              {!search.q && (search.cursor || nextCursor) ? (
+                <div
+                  style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 22 }}
+                >
+                  {search.cursor ? (
+                    <button
+                      className="btn"
+                      type="button"
+                      onClick={() => {
+                        void navigate({
+                          search: (prev) => ({
+                            ...prev,
+                            cursor: undefined,
+                          }),
+                        });
+                      }}
+                    >
+                      First page
+                    </button>
+                  ) : null}
+                  {nextCursor ? (
+                    <button
+                      className="btn btn-primary"
+                      type="button"
+                      onClick={() => {
+                        void navigate({
+                          search: (prev) => ({
+                            ...prev,
+                            cursor: nextCursor,
+                          }),
+                        });
+                      }}
+                    >
+                      Next page
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+            </>
+          )}
         </>
       )}
     </main>

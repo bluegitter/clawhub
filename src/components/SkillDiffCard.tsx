@@ -1,6 +1,6 @@
 import type { DiffEditorProps } from "@monaco-editor/react";
 import { DiffEditor, useMonaco } from "@monaco-editor/react";
-import { useAction } from "convex/react";
+import { useAction } from "../lib/convexCompat";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
@@ -103,7 +103,9 @@ export function SkillDiffCard({ skill, versions, variant = "card" }: SkillDiffCa
       });
     }
 
-    const tagEntries = Object.entries(skill.tags ?? {})
+    const tagEntries = Object.entries(
+      (skill.tags ?? {}) as Record<string, Id<"skillVersions">>,
+    )
       .filter(([tag]) => tag !== "latest")
       .sort(([a], [b]) => a.localeCompare(b));
     for (const [tag, versionId] of tagEntries) {

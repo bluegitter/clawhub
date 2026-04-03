@@ -97,6 +97,8 @@ describe("SkillDetailPage", () => {
               kind: "user",
               handle: "steipete",
               displayName: "Peter",
+              image: null,
+              bio: null,
               linkedUserId: ownerId,
             },
             latestVersion: {
@@ -173,6 +175,8 @@ describe("SkillDetailPage", () => {
               kind: "user",
               handle: "steipete",
               displayName: "Peter",
+              image: null,
+              bio: null,
               linkedUserId: ownerId,
             },
             latestVersion: {
@@ -329,6 +333,8 @@ describe("SkillDetailPage", () => {
               kind: "user",
               handle: "steipete",
               displayName: "Peter",
+              image: null,
+              bio: null,
               linkedUserId: ownerId,
             },
             latestVersion: {

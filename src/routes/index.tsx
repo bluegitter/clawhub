@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useAction, useQuery } from "convex/react";
+import { useAction, useQuery } from "../lib/convexCompat";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import { InstallSwitcher } from "../components/InstallSwitcher";
@@ -11,6 +11,7 @@ import { UserBadge } from "../components/UserBadge";
 import { convexHttp } from "../convex/client";
 import { getSkillBadges } from "../lib/badges";
 import { fetchLocalSkillsList, shouldUseLocalBackend } from "../lib/localBackend";
+import { useLocalStars } from "../lib/useLocalStars";
 import type { PublicPublisher, PublicSkill, PublicSoul } from "../lib/publicUser";
 import { getSiteMode } from "../lib/site";
 
@@ -34,6 +35,7 @@ function SkillsHome() {
   const [highlighted, setHighlighted] = useState<SkillPageEntry[]>([]);
   const [popular, setPopular] = useState<SkillPageEntry[]>([]);
   const useLocalBackend = shouldUseLocalBackend();
+  const { isAuthenticated, starredSet, toggle } = useLocalStars();
 
   useEffect(() => {
     let cancelled = false;
@@ -138,6 +140,18 @@ function SkillsHome() {
                     </div>
                   </div>
                 }
+                extraActions={
+                  useLocalBackend && isAuthenticated ? (
+                    <button
+                      className={`star-toggle${starredSet.has(entry.skill.slug) ? " is-active" : ""}`}
+                      type="button"
+                      onClick={() => void toggle(entry.skill.slug)}
+                      aria-label={starredSet.has(entry.skill.slug) ? "Unstar skill" : "Star skill"}
+                    >
+                      <span aria-hidden="true">★</span>
+                    </button>
+                  ) : null
+                }
               />
             ))
           )}
@@ -169,6 +183,18 @@ function SkillsHome() {
                       <SkillStatsTripletLine stats={entry.skill.stats} />
                     </div>
                   </div>
+                }
+                extraActions={
+                  useLocalBackend && isAuthenticated ? (
+                    <button
+                      className={`star-toggle${starredSet.has(entry.skill.slug) ? " is-active" : ""}`}
+                      type="button"
+                      onClick={() => void toggle(entry.skill.slug)}
+                      aria-label={starredSet.has(entry.skill.slug) ? "Unstar skill" : "Star skill"}
+                    >
+                      <span aria-hidden="true">★</span>
+                    </button>
+                  ) : null
                 }
               />
             ))

@@ -7,12 +7,15 @@ import { isTextContentType, TEXT_FILE_EXTENSION_SET } from "./textFiles";
 describe("packages/clawhub schema textFiles", () => {
   it("exports text-file extension set", () => {
     expect(TEXT_FILE_EXTENSION_SET.has("md")).toBe(true);
+    expect(TEXT_FILE_EXTENSION_SET.has("jsonl")).toBe(true);
+    expect(TEXT_FILE_EXTENSION_SET.has("xsd")).toBe(true);
     expect(TEXT_FILE_EXTENSION_SET.has("exe")).toBe(false);
   });
 
   it("detects text content types with parameters", () => {
     expect(isTextContentType("text/plain; charset=utf-8")).toBe(true);
     expect(isTextContentType("application/json; charset=utf-8")).toBe(true);
+    expect(isTextContentType("application/x-ndjson")).toBe(true);
     expect(isTextContentType("application/octet-stream")).toBe(false);
   });
 

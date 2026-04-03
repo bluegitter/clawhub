@@ -1,19 +1,16 @@
 import { createFileRoute, useSearch } from "@tanstack/react-router";
 import type { PackageCompatibility } from "clawhub-schema";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "../lib/convexCompat";
 import { startTransition, useEffect, useMemo, useState } from "react";
 import semver from "semver";
 import { api } from "../../convex/_generated/api";
 import { PackageSourceChooser } from "../components/PackageSourceChooser";
 import {
-  MAX_PUBLISH_FILE_BYTES,
-  MAX_PUBLISH_TOTAL_BYTES,
-} from "../../convex/lib/publishLimits";
-import {
   buildPackageUploadEntries,
   filterIgnoredPackageFiles,
   normalizePackageUploadFiles,
 } from "../lib/packageUpload";
+import { MAX_PUBLISH_FILE_BYTES, MAX_PUBLISH_TOTAL_BYTES } from "../lib/publishLimits";
 import {
   derivePluginPrefill,
   listPrefilledFields,

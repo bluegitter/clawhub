@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "../lib/convexCompat";
 import { useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
@@ -37,7 +37,12 @@ export function SkillCommentsPanel({ skillId, isAuthenticated, me }: SkillCommen
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportNotice, setReportNotice] = useState<string | null>(null);
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
-  const comments = useQuery(api.comments.listBySkill, { skillId, limit: 50 });
+  const comments = useQuery(api.comments.listBySkill, { skillId, limit: 50 }) as
+    | Array<{
+        comment: Doc<"comments">;
+        user: Doc<"users"> | null;
+      }>
+    | undefined;
 
   const submitComment = async () => {
     const body = comment.trim();

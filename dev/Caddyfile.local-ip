@@ -1,0 +1,14 @@
+https://192.168.20.4:3443 {
+  tls internal
+  reverse_proxy 127.0.0.1:3001
+}
+
+https://192.168.20.4:8443 {
+  tls internal
+  reverse_proxy 127.0.0.1:3210
+}
+
+https://192.168.20.4:8444 {
+  tls internal
+  reverse_proxy 127.0.0.1:3211
+}

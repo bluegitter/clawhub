@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
 import { getDb } from "../db/index";
-import { users, sessions } from "../db/schema/index";
+import { users, sessions, apiTokens } from "../db/schema/index";
 import {
   SSO_BASE_URL,
   SSO_LOGIN_URL,
@@ -13,8 +13,8 @@ import {
   LOCAL_AUTH_ENABLED,
 } from "../db/env";
 import { requireAuth } from "../middleware/auth";
-import { eq } from "drizzle-orm";
-import { randomBytes } from "node:crypto";
+import { and, desc, eq } from "drizzle-orm";
+import { createHash, randomBytes } from "node:crypto";
 
 const app = new Hono();
 
@@ -242,6 +242,63 @@ app.get("/me", requireAuth, async (c) => {
       image: user.image,
     },
   });
+});
+
+app.get("/tokens", requireAuth, async (c) => {
+  const userId = c.get("userId");
+  const db = getDb();
+  const rows = await db.query.apiTokens.findMany({
+    where: eq(apiTokens.userId, userId),
+    orderBy: [desc(apiTokens.createdAt)],
+  });
+
+  return c.json({
+    tokens: rows.map((row) => ({
+      id: row.id,
+      label: row.name ?? "API token",
+      prefix: row.tokenPrefix,
+      createdAt: row.createdAt.getTime(),
+    })),
+  });
+});
+
+app.post("/tokens", requireAuth, async (c) => {
+  const userId = c.get("userId");
+  const payload = (await c.req.json().catch(() => ({}))) as { label?: string };
+  const rawToken = randomBytes(24).toString("hex");
+  const tokenHash = createHash("sha256").update(rawToken).digest("hex");
+  const tokenPrefix = rawToken.slice(0, 8);
+  const label = payload.label?.trim() || "CLI token";
+
+  const db = getDb();
+  const inserted = await db
+    .insert(apiTokens)
+    .values({
+      userId,
+      tokenHash,
+      tokenPrefix,
+      name: label,
+    })
+    .returning();
+
+  const token = inserted[0];
+  return c.json({
+    token: rawToken,
+    meta: {
+      id: token?.id ?? null,
+      label,
+      prefix: tokenPrefix,
+      createdAt: Date.now(),
+    },
+  });
+});
+
+app.delete("/tokens/:id", requireAuth, async (c) => {
+  const userId = c.get("userId");
+  const id = c.req.param("id");
+  const db = getDb();
+  await db.delete(apiTokens).where(and(eq(apiTokens.id, id), eq(apiTokens.userId, userId)));
+  return c.json({ ok: true });
 });
 
 export default app;

@@ -5,3 +5,4 @@ export { skillFiles, skillFilesRelations } from "./skillFiles";
 export { skillEmbeddings } from "./skillEmbeddings";
 export { sessions } from "./sessions";
 export { apiTokens } from "./apiTokens";
+export { stars } from "./stars";
