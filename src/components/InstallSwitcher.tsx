@@ -5,6 +5,9 @@ type PackageManager = "npm" | "pnpm" | "bun";
 
 type InstallSwitcherProps = {
   exampleSlug?: string;
+  registry?: string | null;
+  title?: string;
+  showCopy?: boolean;
 };
 
 const PACKAGE_MANAGERS: Array<{ id: PackageManager; label: string }> = [
@@ -13,25 +16,42 @@ const PACKAGE_MANAGERS: Array<{ id: PackageManager; label: string }> = [
   { id: "bun", label: "bun" },
 ];
 
-export function InstallSwitcher({ exampleSlug = "sonoscli" }: InstallSwitcherProps) {
+export function InstallSwitcher({
+  exampleSlug = "sonoscli",
+  registry,
+  title,
+  showCopy = false,
+}: InstallSwitcherProps) {
   const [pm, setPm] = useState<PackageManager>("npm");
+  const [copied, setCopied] = useState(false);
   const { t } = useI18n();
 
   const command = useMemo(() => {
+    const registryPrefix = registry ? `CLAWHUB_REGISTRY=${registry} ` : "";
     switch (pm) {
       case "npm":
-        return `npx clawhub@latest install ${exampleSlug}`;
+        return `${registryPrefix}npx clawhub@latest install ${exampleSlug}`;
       case "pnpm":
-        return `pnpm dlx clawhub@latest install ${exampleSlug}`;
+        return `${registryPrefix}pnpm dlx clawhub@latest install ${exampleSlug}`;
       case "bun":
-        return `bunx clawhub@latest install ${exampleSlug}`;
+        return `${registryPrefix}bunx clawhub@latest install ${exampleSlug}`;
     }
-  }, [exampleSlug, pm]);
+  }, [exampleSlug, pm, registry]);
+
+  const copyCommand = async () => {
+    try {
+      await navigator.clipboard.writeText(command);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
+    } catch {
+      setCopied(false);
+    }
+  };
 
   return (
     <div className="install-switcher">
       <div className="install-switcher-row">
-        <div className="stat">{t("home.install.oneShot")}</div>
+        <div className="stat">{title ?? t("home.install.oneShot")}</div>
         <div
           className="install-switcher-toggle"
           role="tablist"
@@ -53,7 +73,14 @@ export function InstallSwitcher({ exampleSlug = "sonoscli" }: InstallSwitcherPro
           ))}
         </div>
       </div>
-      <div className="hero-install-code mono">{command}</div>
+      <div className="install-switcher-command">
+        <div className="hero-install-code mono">{command}</div>
+        {showCopy ? (
+          <button type="button" className="btn install-switcher-copy" onClick={() => void copyCommand()}>
+            {copied ? t("common.copied") : t("common.copy")}
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }

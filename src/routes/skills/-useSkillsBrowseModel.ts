@@ -61,6 +61,7 @@ export function useSkillsBrowseModel({
   const [listResults, setListResults] = useState<SkillListEntry[]>([]);
   const [listCursor, setListCursor] = useState<string | null>(null);
   const [listStatus, setListStatus] = useState<ListStatus>("loading");
+  const [listTotalCount, setListTotalCount] = useState(0);
   const fetchGeneration = useRef(0);
 
   const fetchPage = useCallback(
@@ -76,6 +77,9 @@ export function useSkillsBrowseModel({
         page = result.items as SkillListEntry[];
         nextCursor = result.nextCursor;
         if (generation !== fetchGeneration.current) return;
+        if (!cursor) {
+          setListTotalCount(result.totalCount ?? page.length);
+        }
         const canAdvance = nextCursor != null;
         setListResults((prev) => (cursor ? [...prev, ...page] : page));
         setListCursor(canAdvance ? nextCursor : null);
@@ -97,6 +101,7 @@ export function useSkillsBrowseModel({
     const generation = fetchGeneration.current;
     setListResults([]);
     setListCursor(null);
+    setListTotalCount(0);
     setListStatus("loading");
     void fetchPage(null, generation);
   }, [hasQuery, fetchPage]);
@@ -376,6 +381,7 @@ export function useSkillsBrowseModel({
     query,
     sort,
     sorted,
+    totalCount: hasQuery ? sorted.length : listTotalCount,
     view,
   };
 }

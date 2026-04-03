@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { InstallSwitcher } from "./InstallSwitcher";
 import { useI18n } from "../lib/i18n";
 import {
   getLocalStarStatus,
@@ -170,6 +171,16 @@ export function LocalSkillDetailPage({ slug, canonicalOwner, data }: LocalSkillD
               ) : null}
             </div>
           </div>
+        </div>
+      </div>
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="hero-install">
+          <InstallSwitcher
+            exampleSlug={data.skill.slug}
+            registry={backendOrigin || null}
+            title={t("localSkill.installCommand")}
+            showCopy
+          />
         </div>
       </div>
       {isOwner ? (

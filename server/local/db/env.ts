@@ -10,3 +10,14 @@ export const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 export const DEFAULT_PAGE_SIZE = 20;
 export const LOCAL_AUTH_ENABLED = process.env.LOCAL_AUTH_ENABLED !== "0";
 export const SSO_ENABLED = process.env.SSO_ENABLED !== "0";
+
+function parseCsvEnv(value: string | undefined) {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+export const CORS_ALLOWED_ORIGINS = parseCsvEnv(process.env.CORS_ALLOWED_ORIGINS);
+export const REDIRECT_ALLOWED_ORIGINS = parseCsvEnv(process.env.REDIRECT_ALLOWED_ORIGINS);

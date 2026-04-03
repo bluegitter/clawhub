@@ -28,6 +28,7 @@ type LocalSkillListResponse = {
     };
   }>;
   nextCursor: string | null;
+  totalCount?: number;
 };
 
 type LocalSkillResponse = {
@@ -256,6 +257,7 @@ export async function fetchLocalSkillsList(params: {
         }, entry.score),
       ),
       nextCursor: null,
+      totalCount: data.results.length,
     };
   }
 
@@ -268,6 +270,7 @@ export async function fetchLocalSkillsList(params: {
   return {
     items: data.items.map((entry) => toLocalListEntry(entry)),
     nextCursor: data.nextCursor,
+    totalCount: data.totalCount ?? data.items.length,
   };
 }
 

@@ -1,19 +1,9 @@
 import { createMiddleware } from "hono/factory";
+import { CORS_ALLOWED_ORIGINS } from "../db/env";
 
 function resolveAllowedOrigin(origin: string | null) {
   if (!origin) return null;
-  try {
-    const url = new URL(origin);
-    if (
-      ["localhost", "127.0.0.1", "192.168.20.4"].includes(url.hostname) &&
-      ["3000", "3001"].includes(url.port)
-    ) {
-      return origin;
-    }
-  } catch {
-    // ignore invalid origin
-  }
-  return null;
+  return CORS_ALLOWED_ORIGINS.includes(origin) ? origin : null;
 }
 
 export const cors = createMiddleware(async (c, next) => {

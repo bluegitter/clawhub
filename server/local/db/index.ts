@@ -1,5 +1,6 @@
 import pg from "pg";
-import { access, mkdir, readFile, rm, symlink } from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { access, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -53,7 +54,17 @@ export async function startDatabase(): Promise<{ db: DB; pool: pg.Pool }> {
     const isInitialized = await hasInitializedCluster(EMBEDDED_DATA_DIR);
     if (!isInitialized) {
       await rm(EMBEDDED_DATA_DIR, { recursive: true, force: true });
-      await embeddedPg.initialise();
+      try {
+        await embeddedPg.initialise();
+      } catch (error) {
+        if (process.platform !== "linux") throw error;
+        console.warn("embedded-postgres initialise() failed; falling back to direct initdb on Linux.");
+        await manualInitialiseEmbeddedCluster(EMBEDDED_DATA_DIR);
+      }
+    }
+
+    if (process.platform === "linux") {
+      await normalizeEmbeddedPostgresConfig(EMBEDDED_DATA_DIR);
     }
 
     await embeddedPg.start();
@@ -133,6 +144,76 @@ async function ensureEmbeddedPostgresSymlinks() {
   }
 }
 
+async function manualInitialiseEmbeddedCluster(databaseDir: string) {
+  const nativeDir = await resolveEmbeddedPostgresNativeDir();
+  const initdbPath = join(nativeDir, "bin", "initdb");
+  const passwordFile = join("/tmp", `clawhub-pg-password-${process.pid}.txt`);
+
+  await mkdir(dirname(databaseDir), { recursive: true });
+
+  try {
+    await writeFile(passwordFile, `${EMBEDDED_PASSWORD}\n`);
+    await runChildProcess(initdbPath, [
+      `--pgdata=${databaseDir}`,
+      "--auth=password",
+      `--username=${EMBEDDED_USER}`,
+      `--pwfile=${passwordFile}`,
+      "--lc-messages=C",
+    ]);
+  } finally {
+    await rm(passwordFile, { force: true }).catch(() => {});
+  }
+}
+
+async function normalizeEmbeddedPostgresConfig(databaseDir: string) {
+  const configPath = join(databaseDir, "postgresql.conf");
+  try {
+    const current = await readFile(configPath, "utf8");
+    const normalized = current.replace(
+      /^lc_messages\s*=\s*'en_US\.UTF-8'$/m,
+      "lc_messages = 'C'",
+    );
+    if (normalized !== current) {
+      await writeFile(configPath, normalized);
+    }
+  } catch {
+    // ignore missing config on first bootstrap
+  }
+}
+
+async function runChildProcess(command: string, args: string[]) {
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(command, args, {
+      env: {
+        ...process.env,
+        LC_ALL: "C",
+        LANG: "C",
+        LC_MESSAGES: "C",
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    child.stdout.on("data", (chunk) => {
+      const message = chunk.toString("utf8").trim();
+      if (message) console.log(`[embedded-postgres] ${message}`);
+    });
+
+    child.stderr.on("data", (chunk) => {
+      const message = chunk.toString("utf8").trim();
+      if (message) console.error(`[embedded-postgres] ${message}`);
+    });
+
+    child.on("error", reject);
+    child.on("exit", (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`Command failed: ${command} ${args.join(" ")} (exit ${code ?? "null"})`));
+      }
+    });
+  });
+}
+
 async function resolveEmbeddedPostgresNativeDir() {
   const packageName = getEmbeddedPostgresPackageName();
   const embeddedPostgresEntry = require.resolve("embedded-postgres");
@@ -208,15 +289,6 @@ async function ensureLocalSchema(db: DB) {
   `));
 
   await db.execute(sql.raw(`
-    CREATE TABLE IF NOT EXISTS stars (
-      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id uuid NOT NULL REFERENCES users(id) ON DELETE cascade,
-      skill_id uuid NOT NULL REFERENCES skills(id) ON DELETE cascade,
-      created_at timestamptz NOT NULL DEFAULT now()
-    );
-  `));
-
-  await db.execute(sql.raw(`
     CREATE TABLE IF NOT EXISTS skills (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       slug text NOT NULL UNIQUE,
@@ -230,6 +302,15 @@ async function ensureLocalSchema(db: DB) {
       tags text[] DEFAULT ARRAY[]::text[],
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now()
+    );
+  `));
+
+  await db.execute(sql.raw(`
+    CREATE TABLE IF NOT EXISTS stars (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE cascade,
+      skill_id uuid NOT NULL REFERENCES skills(id) ON DELETE cascade,
+      created_at timestamptz NOT NULL DEFAULT now()
     );
   `));
 

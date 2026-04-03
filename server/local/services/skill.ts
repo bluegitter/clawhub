@@ -16,7 +16,8 @@ import type { User } from "../db/schema/users";
 
 export async function listSkills(cursor: string | null, limit: number) {
   const db = getDb();
-  const rows = await db
+  const [rows, countRow] = await Promise.all([
+    db
     .select({
       id: skills.id,
       slug: skills.slug,
@@ -34,7 +35,12 @@ export async function listSkills(cursor: string | null, limit: number) {
     .innerJoin(users, eq(skills.ownerId, users.id))
     .where(eq(skills.visibility, "public"))
     .orderBy(desc(skills.updatedAt))
-    .limit(Math.max(limit, 1));
+    .limit(Math.max(limit, 1)),
+    db
+      .select({ count: sql<number>`cast(count(*) as int)` })
+      .from(skills)
+      .where(eq(skills.visibility, "public")),
+  ]);
 
   const statsBySkillId = await getSkillStatsMap(rows.map((row) => row.id));
 
@@ -67,6 +73,7 @@ export async function listSkills(cursor: string | null, limit: number) {
         : undefined,
     })),
     nextCursor,
+    totalCount: Number(countRow[0]?.count ?? rows.length),
   };
 }
 

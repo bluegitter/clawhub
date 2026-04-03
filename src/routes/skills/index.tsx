@@ -58,11 +58,14 @@ export function SkillsIndex() {
     searchInputRef,
   });
 
+  const titleCount = model.isLoadingSkills ? null : model.totalCount.toLocaleString("en-US");
+
   return (
     <main className="section">
       <header className="skills-header-top">
         <h1 className="section-title" style={{ marginBottom: 8 }}>
           {t("skills.title")}
+          {titleCount ? ` (${titleCount})` : ""}
         </h1>
         <p className="section-subtitle" style={{ marginBottom: 0 }}>
           {model.isLoadingSkills

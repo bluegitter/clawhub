@@ -9,6 +9,7 @@ import {
   SSO_APP_SECRET,
   SSO_ENABLED,
   APP_URL,
+  REDIRECT_ALLOWED_ORIGINS,
   SESSION_MAX_AGE_MS,
   LOCAL_AUTH_ENABLED,
 } from "../db/env";
@@ -87,7 +88,7 @@ function withSessionTokenRedirect(target: string, sessionToken: string) {
 }
 
 function resolveSafeRedirect(input: string | null | undefined, fallback: string, requestUrl?: string) {
-  const candidates = [fallback];
+  const candidates = [fallback, ...REDIRECT_ALLOWED_ORIGINS];
   if (requestUrl) {
     try {
       candidates.push(new URL("/", requestUrl).toString());
@@ -101,14 +102,20 @@ function resolveSafeRedirect(input: string | null | undefined, fallback: string,
   try {
     const url = new URL(input);
     const allowedHosts = new Set<string>();
+    const localhostAllowedHosts = new Set<string>();
     for (const candidate of candidates) {
       try {
-        allowedHosts.add(new URL(candidate).host);
+        const candidateUrl = new URL(candidate);
+        allowedHosts.add(candidateUrl.host);
+        if (["localhost", "127.0.0.1"].includes(candidateUrl.hostname)) {
+          localhostAllowedHosts.add(candidateUrl.host);
+        }
       } catch {
         // ignore invalid candidate
       }
     }
-    if (["localhost", "127.0.0.1"].includes(url.hostname) || allowedHosts.has(url.host)) {
+    const isLocalhost = ["localhost", "127.0.0.1"].includes(url.hostname);
+    if ((isLocalhost && localhostAllowedHosts.has(url.host)) || allowedHosts.has(url.host)) {
       return url.toString();
     }
   } catch {

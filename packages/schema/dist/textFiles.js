@@ -3,6 +3,7 @@ const RAW_TEXT_FILE_EXTENSIONS = [
     "mdx",
     "txt",
     "json",
+    "jsonl",
     "json5",
     "yaml",
     "yml",
@@ -43,6 +44,7 @@ export const TEXT_FILE_EXTENSIONS = RAW_TEXT_FILE_EXTENSIONS;
 export const TEXT_FILE_EXTENSION_SET = new Set(TEXT_FILE_EXTENSIONS);
 const RAW_TEXT_CONTENT_TYPES = [
     "application/json",
+    "application/x-ndjson",
     "application/xml",
     "application/yaml",
     "application/x-yaml",
