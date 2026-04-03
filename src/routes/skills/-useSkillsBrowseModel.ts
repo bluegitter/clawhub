@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { fetchLocalSkillsList } from "../../lib/localBackend";
+import { fetchLocalSkillLabels, fetchLocalSkillsList } from "../../lib/localBackend";
 import { parseDir, parseSort, toListSort, type SortDir, type SortKey } from "./-params";
 import type { SkillListEntry, SkillSearchEntry } from "./-types";
 
@@ -9,6 +9,7 @@ type SkillsView = "cards" | "list";
 
 export type SkillsSearchState = {
   q?: string;
+  label?: string;
   sort?: SortKey;
   dir?: SortDir;
   highlighted?: boolean;
@@ -34,6 +35,7 @@ export function useSkillsBrowseModel({
   searchInputRef: RefObject<HTMLInputElement | null>;
 }) {
   const [query, setQuery] = useState(search.q ?? "");
+  const [availableLabels, setAvailableLabels] = useState<Array<{ label: string; count: number }>>([]);
   const [searchResults, setSearchResults] = useState<Array<SkillSearchEntry>>([]);
   const [searchLimit, setSearchLimit] = useState(pageSize);
   const [isSearching, setIsSearching] = useState(false);
@@ -43,6 +45,7 @@ export function useSkillsBrowseModel({
   const navigateTimer = useRef<number>(0);
 
   const view: SkillsView = search.view ?? "list";
+  const activeLabel = search.label?.trim().toLowerCase() || "";
   const highlightedOnly = search.highlighted ?? false;
   const nonSuspiciousOnly = search.nonSuspicious ?? false;
   const trimmedQuery = useMemo(() => query.trim(), [query]);
@@ -73,6 +76,7 @@ export function useSkillsBrowseModel({
         const result = await fetchLocalSkillsList({
           cursor,
           limit: pageSize,
+          label: activeLabel || undefined,
         });
         page = result.items as SkillListEntry[];
         nextCursor = result.nextCursor;
@@ -91,7 +95,7 @@ export function useSkillsBrowseModel({
         setListStatus(cursor ? "idle" : "done");
       }
     },
-    [dir, highlightedOnly, listSort, nonSuspiciousOnly],
+    [activeLabel, dir, highlightedOnly, listSort, nonSuspiciousOnly],
   );
 
   // Reset and fetch first page when sort/dir/filters change
@@ -105,6 +109,20 @@ export function useSkillsBrowseModel({
     setListStatus("loading");
     void fetchPage(null, generation);
   }, [hasQuery, fetchPage]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchLocalSkillLabels()
+      .then((items) => {
+        if (!cancelled) setAvailableLabels(items);
+      })
+      .catch(() => {
+        if (!cancelled) setAvailableLabels([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const isLoadingList = listStatus === "loading";
   const canLoadMoreList = listStatus === "idle";
@@ -143,6 +161,7 @@ export function useSkillsBrowseModel({
           const data = (await fetchLocalSkillsList({
             query: trimmedQuery,
             limit: searchLimit,
+            label: activeLabel || undefined,
           })).items.map((entry) => ({
             skill: entry.skill,
             version: entry.latestVersion,
@@ -167,6 +186,7 @@ export function useSkillsBrowseModel({
     nonSuspiciousOnly,
     searchLimit,
     trimmedQuery,
+    activeLabel,
   ]);
 
   const baseItems = useMemo(() => {
@@ -321,6 +341,20 @@ export function useSkillsBrowseModel({
     });
   }, [navigate]);
 
+  const onLabelChange = useCallback(
+    (next: string) => {
+      const normalized = next.trim().toLowerCase();
+      void navigate({
+        search: (prev) => ({
+          ...prev,
+          label: normalized || undefined,
+        }),
+        replace: true,
+      });
+    },
+    [navigate],
+  );
+
   const onSortChange = useCallback(
     (value: string) => {
       const nextSort = parseSort(value);
@@ -357,6 +391,7 @@ export function useSkillsBrowseModel({
   }, [navigate]);
 
   const activeFilters: string[] = [];
+  if (activeLabel) activeFilters.push(`#${activeLabel}`);
   if (highlightedOnly) activeFilters.push("highlighted");
   if (nonSuspiciousOnly) activeFilters.push("non-suspicious");
 
@@ -379,9 +414,12 @@ export function useSkillsBrowseModel({
     onToggleNonSuspicious,
     onToggleView,
     query,
+    activeLabel,
+    availableLabels,
     sort,
     sorted,
     totalCount: hasQuery ? sorted.length : listTotalCount,
     view,
+    onLabelChange,
   };
 }

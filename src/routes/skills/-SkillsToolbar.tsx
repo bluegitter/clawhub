@@ -5,6 +5,8 @@ import { type SortDir, type SortKey } from "./-params";
 type SkillsToolbarProps = {
   searchInputRef: RefObject<HTMLInputElement | null>;
   query: string;
+  activeLabel: string;
+  availableLabels: Array<{ label: string; count: number }>;
   hasQuery: boolean;
   sort: SortKey;
   dir: SortDir;
@@ -12,6 +14,7 @@ type SkillsToolbarProps = {
   highlightedOnly: boolean;
   nonSuspiciousOnly: boolean;
   onQueryChange: (next: string) => void;
+  onLabelChange: (next: string) => void;
   onToggleHighlighted: () => void;
   onToggleNonSuspicious: () => void;
   onSortChange: (value: string) => void;
@@ -22,6 +25,8 @@ type SkillsToolbarProps = {
 export function SkillsToolbar({
   searchInputRef,
   query,
+  activeLabel,
+  availableLabels,
   hasQuery,
   sort,
   dir,
@@ -29,6 +34,7 @@ export function SkillsToolbar({
   highlightedOnly,
   nonSuspiciousOnly,
   onQueryChange,
+  onLabelChange,
   onToggleHighlighted,
   onToggleNonSuspicious,
   onSortChange,
@@ -48,6 +54,19 @@ export function SkillsToolbar({
         />
       </div>
       <div className="skills-toolbar-row">
+        <select
+          className="skills-sort"
+          value={activeLabel}
+          onChange={(event) => onLabelChange(event.target.value)}
+          aria-label={t("skills.filterByLabel")}
+        >
+          <option value="">{t("skills.allLabels")}</option>
+          {availableLabels.map((entry) => (
+            <option key={entry.label} value={entry.label}>
+              {`${entry.label} (${entry.count})`}
+            </option>
+          ))}
+        </select>
         <button
           className={`search-filter-button${highlightedOnly ? " is-active" : ""}`}
           type="button"

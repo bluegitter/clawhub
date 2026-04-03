@@ -1,10 +1,12 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { InstallSwitcher } from "./InstallSwitcher";
+import { LabelChipInput } from "./LabelChipInput";
 import { useI18n } from "../lib/i18n";
 import {
   getLocalStarStatus,
   renameLocalSkill,
+  setLocalSkillLabels,
   shouldUseLocalBackend,
   toggleLocalStar,
   type LocalSkillDetailData,
@@ -28,7 +30,9 @@ export function LocalSkillDetailPage({ slug, canonicalOwner, data }: LocalSkillD
   const [isStarred, setIsStarred] = useState(false);
   const [isUpdatingStar, setIsUpdatingStar] = useState(false);
   const [renameSlug, setRenameSlug] = useState(data?.resolvedSlug ?? slug);
+  const [labelsDraft, setLabelsDraft] = useState<string[]>(data?.skill?.labels ?? []);
   const [isRenaming, setIsRenaming] = useState(false);
+  const [isSavingLabels, setIsSavingLabels] = useState(false);
   const backendOrigin = getLocalBackendOrigin() ?? "";
 
   const latestVersion = data?.latestVersion?.version ?? null;
@@ -54,6 +58,10 @@ export function LocalSkillDetailPage({ slug, canonicalOwner, data }: LocalSkillD
   useEffect(() => {
     setRenameSlug(data?.resolvedSlug ?? slug);
   }, [data?.resolvedSlug, slug]);
+
+  useEffect(() => {
+    setLabelsDraft(data?.skill?.labels ?? []);
+  }, [data?.skill?.labels]);
 
   useEffect(() => {
     if (!shouldUseLocalBackend() || !isAuthenticated || !data?.skill) {
@@ -127,6 +135,22 @@ export function LocalSkillDetailPage({ slug, canonicalOwner, data }: LocalSkillD
     }
   };
 
+  const handleSaveLabels = async () => {
+    if (!data?.skill || !isOwner || isSavingLabels) return;
+    setIsSavingLabels(true);
+    try {
+      await setLocalSkillLabels(
+        data.skill.slug,
+        labelsDraft,
+      );
+      window.location.reload();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Failed to update labels.");
+    } finally {
+      setIsSavingLabels(false);
+    }
+  };
+
   return (
     <main className="section">
       <div className="card skill-hero">
@@ -151,6 +175,15 @@ export function LocalSkillDetailPage({ slug, canonicalOwner, data }: LocalSkillD
               <div className="stat">
                 ★ {starCount} · ↓ {data.skill.stats.downloads}
               </div>
+              {data.skill.labels?.length ? (
+                <div className="skill-card-tags" style={{ marginTop: 12 }}>
+                  {data.skill.labels.map((label) => (
+                    <span key={label} className="tag tag-compact">
+                      #{label}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
             </div>
             <div className="skill-hero-actions">
               {downloadHref ? (
@@ -188,33 +221,59 @@ export function LocalSkillDetailPage({ slug, canonicalOwner, data }: LocalSkillD
           <h2 className="section-title" style={{ marginTop: 0 }}>
             {t("localSkill.ownerTools")}
           </h2>
-          <p className="section-subtitle">{t("localSkill.ownerToolsSubtitle")}</p>
+          <p className="section-subtitle skill-owner-tools-subtitle">
+            {t("localSkill.ownerToolsSubtitle")}
+          </p>
           <div className="skill-owner-tools-grid">
-            <label className="management-control management-control-stack">
-              <span className="mono">{t("localSkill.renameSlug")}</span>
-              <input
-                className="management-field"
-                value={renameSlug}
-                onChange={(event) => setRenameSlug(event.target.value)}
-                placeholder={t("localSkill.renamePlaceholder")}
-                autoComplete="off"
-                spellCheck={false}
-              />
-              <span className="section-subtitle">
-                {t("localSkill.currentPage")}:{" "}
-                {buildSkillHref(ownerProfile?.handle ?? ownerLabel ?? null, null, data.skill.slug)}
-              </span>
-            </label>
-            <div className="management-control management-control-stack">
-              <span className="mono">{t("localSkill.renameAction")}</span>
-              <button
-                className="btn management-action-btn"
-                type="button"
-                onClick={() => void handleRename()}
-                disabled={isRenaming || renameSlug.trim().toLowerCase() === data.skill.slug}
-              >
-                {isRenaming ? t("localSkill.renaming") : t("localSkill.renameAndRedirect")}
-              </button>
+            <div className="skill-owner-tool-row">
+              <label className="management-control management-control-stack skill-owner-tool-field">
+                <span className="mono">{t("localSkill.renameSlug")}</span>
+                <input
+                  className="management-field"
+                  value={renameSlug}
+                  onChange={(event) => setRenameSlug(event.target.value)}
+                  placeholder={t("localSkill.renamePlaceholder")}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <span className="section-subtitle">
+                  {t("localSkill.currentPage")}:{" "}
+                  {buildSkillHref(ownerProfile?.handle ?? ownerLabel ?? null, null, data.skill.slug)}
+                </span>
+              </label>
+              <div className="management-control management-control-stack skill-owner-tool-action">
+                <span className="mono">{t("localSkill.renameAction")}</span>
+                <button
+                  className="btn management-action-btn"
+                  type="button"
+                  onClick={() => void handleRename()}
+                  disabled={isRenaming || renameSlug.trim().toLowerCase() === data.skill.slug}
+                >
+                  {isRenaming ? t("localSkill.renaming") : t("localSkill.renameAndRedirect")}
+                </button>
+              </div>
+            </div>
+            <div className="skill-owner-tool-row">
+              <label className="management-control management-control-stack skill-owner-tool-field">
+                <span className="mono">{t("localSkill.skillLabels")}</span>
+                <LabelChipInput
+                  labels={labelsDraft}
+                  onChange={setLabelsDraft}
+                  placeholder={t("localSkill.skillLabelsPlaceholder")}
+                />
+                <span className="section-subtitle">{t("localSkill.skillLabelsHelp")}</span>
+              </label>
+              <div className="management-control management-control-stack skill-owner-tool-action">
+                <span className="mono">{t("localSkill.skillLabelsAction")}</span>
+                <button
+                  className="btn management-action-btn"
+                  type="button"
+                  onClick={() => void handleSaveLabels()}
+                  disabled={isSavingLabels}
+                >
+                  {isSavingLabels ? t("detail.saving") : t("localSkill.saveLabels")}
+                </button>
+              </div>
             </div>
           </div>
         </div>

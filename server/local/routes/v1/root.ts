@@ -1,12 +1,12 @@
 import { Hono } from "hono";
 import { requireAuth, optionalAuth } from "../../middleware/auth";
 import { getDb } from "../../db/index";
-import { skills, stars, users } from "../../db/schema/index";
+import { skillLabels, skills, stars, users } from "../../db/schema/index";
 import { searchSkills } from "../../services/search";
 import { getSkillStatsMap, getVersionArchive, resolveSkillVersion } from "../../services/skill";
 import { buildDeterministicZip } from "../../services/zipBuilder";
 import type { AuthVariables } from "../../middleware/auth";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 
 const app = new Hono<{ Variables: AuthVariables }>();
 
@@ -17,7 +17,8 @@ function toResponseBody(data: Uint8Array | Buffer) {
 app.get("/search", optionalAuth, async (c) => {
   const query = c.req.query("q") ?? "";
   const limit = Math.min(parseInt(c.req.query("limit") ?? "20"), 100);
-  const results = await searchSkills(query, limit);
+  const label = c.req.query("label")?.trim() ?? null;
+  const results = await searchSkills(query, limit, { label });
   const statsBySkillId = await getSkillStatsMap(results.map((entry) => entry.id));
   return c.json({
     results: results.map((entry) => ({
@@ -26,7 +27,8 @@ app.get("/search", optionalAuth, async (c) => {
       displayName: entry.name,
       summary: entry.summary,
       version: entry.latestVersion,
-      tags: entry.tags ?? [],
+      tags: {},
+      labels: entry.labels ?? [],
       stats: statsBySkillId.get(entry.id) ?? {
         stars: 0,
         downloads: 0,
@@ -99,8 +101,8 @@ app.get("/stars", requireAuth, async (c) => {
       displayName: skills.name,
       summary: skills.summary,
       latestVersion: skills.latestVersion,
-      tags: skills.tags,
       updatedAt: skills.updatedAt,
+      labels: sql<string[]>`coalesce(array_agg(distinct ${skillLabels.label}) filter (where ${skillLabels.label} is not null), ARRAY[]::text[])`,
       ownerId: users.id,
       ownerHandle: users.username,
       ownerDisplayName: users.realName,
@@ -109,7 +111,22 @@ app.get("/stars", requireAuth, async (c) => {
     .from(stars)
     .innerJoin(skills, eq(stars.skillId, skills.id))
     .innerJoin(users, eq(skills.ownerId, users.id))
+    .leftJoin(skillLabels, eq(skillLabels.skillId, skills.id))
     .where(and(eq(stars.userId, userId), eq(skills.visibility, "public")))
+    .groupBy(
+      stars.id,
+      stars.createdAt,
+      skills.id,
+      skills.slug,
+      skills.name,
+      skills.summary,
+      skills.latestVersion,
+      skills.updatedAt,
+      users.id,
+      users.username,
+      users.realName,
+      users.image,
+    )
     .orderBy(desc(stars.createdAt));
   const statsBySkillId = await getSkillStatsMap(rows.map((row) => row.skillId));
 
@@ -122,7 +139,8 @@ app.get("/stars", requireAuth, async (c) => {
         displayName: row.displayName,
         summary: row.summary,
         latestVersion: row.latestVersion,
-        tags: row.tags ?? [],
+        tags: {},
+        labels: row.labels ?? [],
         stats: statsBySkillId.get(row.skillId) ?? {
           stars: 0,
           downloads: 0,

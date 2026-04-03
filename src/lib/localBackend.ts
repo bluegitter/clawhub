@@ -12,6 +12,7 @@ type LocalSkillListResponse = {
     displayName: string;
     summary: string | null;
     tags: unknown;
+    labels?: unknown;
     stats?: unknown;
     createdAt: number;
     updatedAt: number;
@@ -38,6 +39,7 @@ type LocalSkillResponse = {
     displayName: string;
     summary: string | null;
     tags: unknown;
+    labels?: unknown;
     stats?: unknown;
     createdAt: number;
     updatedAt: number;
@@ -102,6 +104,7 @@ type LocalSearchResponse = {
     summary?: string | null;
     version?: string | null;
     tags?: unknown;
+    labels?: unknown;
     stats?: unknown;
     owner?: {
       handle: string | null;
@@ -165,6 +168,7 @@ type LocalStarsResponse = {
       summary: string | null;
       latestVersion: string | null;
       tags: unknown;
+      labels?: unknown;
       stats?: unknown;
       updatedAt: number;
     };
@@ -224,12 +228,14 @@ export async function fetchLocalSkillsList(params: {
   cursor?: string | null;
   limit?: number;
   query?: string;
+  label?: string;
 }) {
   const backend = requireLocalBackendOrigin();
   if (params.query?.trim()) {
     const url = new URL("/api/v1/search", backend);
     url.searchParams.set("q", params.query.trim());
     url.searchParams.set("limit", String(params.limit ?? 25));
+    if (params.label?.trim()) url.searchParams.set("label", params.label.trim().toLowerCase());
     const response = await fetch(url.toString());
     if (!response.ok) throw new Error(`Failed to search skills (${response.status})`);
     const data = (await response.json()) as LocalSearchResponse;
@@ -241,6 +247,7 @@ export async function fetchLocalSkillsList(params: {
           displayName: entry.displayName ?? entry.slug ?? "Unknown skill",
           summary: entry.summary ?? null,
           tags: entry.tags,
+          labels: entry.labels,
           stats: entry.stats,
           owner: entry.owner ?? null,
           ownerHandle: entry.owner?.handle ?? null,
@@ -264,6 +271,7 @@ export async function fetchLocalSkillsList(params: {
   const url = new URL("/api/v1/skills", backend);
   url.searchParams.set("limit", String(params.limit ?? 25));
   if (params.cursor) url.searchParams.set("cursor", params.cursor);
+  if (params.label?.trim()) url.searchParams.set("label", params.label.trim().toLowerCase());
   const response = await fetch(url.toString());
   if (!response.ok) throw new Error(`Failed to load skills (${response.status})`);
   const data = (await response.json()) as LocalSkillListResponse;
@@ -318,7 +326,7 @@ export async function fetchLocalSkillDetail(slug: string): Promise<LocalSkillDet
 
     const readmeCandidates = ["SKILL.md", "skills.md"];
     for (const candidate of readmeCandidates) {
-      const readmeUrl = new URL(`/api/v1/skills/${encodeURIComponent(slug)}/file`, backend);
+    const readmeUrl = new URL(`/api/v1/skills/${encodeURIComponent(slug)}/file`, backend);
       readmeUrl.searchParams.set("path", candidate);
       readmeUrl.searchParams.set("version", latestVersionValue);
       const readmeResponse = await fetch(readmeUrl.toString());
@@ -340,7 +348,8 @@ export async function fetchLocalSkillDetail(slug: string): Promise<LocalSkillDet
     updatedAt: detail.skill.updatedAt,
     latestVersion: detail.latestVersion?.version,
     ownerHandle: detail.owner?.handle ?? null,
-    tags: normalizeStringArray(detail.skill.tags),
+    versionTags: normalizeTagMap(detail.skill.tags),
+    labels: normalizeStringArray(detail.skill.labels),
     stats: normalizeStats(detail.skill.stats),
   });
 
@@ -488,7 +497,8 @@ export async function listLocalStarredSkills(): Promise<LocalStarredSkillEntry[]
       updatedAt: entry.skill.updatedAt,
       latestVersion: entry.skill.latestVersion,
       ownerHandle: entry.owner?.handle ?? null,
-      tags: normalizeStringArray(entry.skill.tags),
+      versionTags: normalizeTagMap(entry.skill.tags),
+      labels: normalizeStringArray(entry.skill.labels),
       stats: normalizeStats(entry.skill.stats),
     }),
     owner: entry.owner
@@ -576,6 +586,7 @@ export async function publishLocalSkill(params: {
   version: string;
   changelog: string;
   tags: string[];
+  labels: string[];
   files: Array<{ path: string; file: File }>;
 }) {
   const backend = requireLocalBackendOrigin();
@@ -588,6 +599,7 @@ export async function publishLocalSkill(params: {
       version: params.version,
       changelog: params.changelog,
       tags: params.tags,
+      labels: params.labels,
     }),
   );
   params.files.forEach((entry, index) => {
@@ -664,6 +676,32 @@ export async function setLocalSkillVersionTags(slug: string, version: string, ta
   return (await response.json()) as { ok: true; tags: Record<string, string> };
 }
 
+export async function fetchLocalSkillLabels() {
+  const backend = requireLocalBackendOrigin();
+  const response = await fetch(new URL("/api/v1/skills/labels", backend).toString());
+  if (!response.ok) throw new Error(`Failed to load skill labels (${response.status})`);
+  const data = (await response.json()) as { items: Array<{ label: string; count: number }> };
+  return data.items;
+}
+
+export async function setLocalSkillLabels(slug: string, labels: string[]) {
+  const backend = requireLocalBackendOrigin();
+  const response = await fetch(new URL(`/api/v1/skills/${encodeURIComponent(slug)}/labels`, backend).toString(), {
+    method: "PUT",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...(buildLocalAuthHeaders() ?? {}),
+    },
+    body: JSON.stringify({ labels }),
+  });
+  if (!response.ok) {
+    const data = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(data.error || `Update labels failed (${response.status})`);
+  }
+  return (await response.json()) as { ok: true; labels: string[] };
+}
+
 export async function renameLocalSkill(slug: string, newSlug: string) {
   const backend = requireLocalBackendOrigin();
   const response = await fetch(
@@ -731,6 +769,7 @@ function toLocalListEntry(
     displayName: string;
     summary: string | null;
     tags?: unknown;
+    labels?: unknown;
     stats?: unknown;
     id?: string;
     ownerHandle?: string | null;
@@ -760,7 +799,8 @@ function toLocalListEntry(
       updatedAt: entry.updatedAt,
       latestVersion: entry.latestVersion?.version,
       ownerHandle: entry.ownerHandle ?? entry.owner?.handle ?? null,
-      tags: normalizeStringArray(entry.tags),
+      versionTags: normalizeTagMap(entry.tags),
+      labels: normalizeStringArray(entry.labels),
       stats: normalizeStats(entry.stats),
     }),
     latestVersion: entry.latestVersion
@@ -792,7 +832,8 @@ function toPublicSkill(params: {
   updatedAt: number;
   latestVersion?: string | null;
   ownerHandle?: string | null;
-  tags?: string[];
+  versionTags?: Record<string, string>;
+  labels?: string[];
   stats?: {
     stars: number;
     downloads: number;
@@ -812,7 +853,8 @@ function toPublicSkill(params: {
     canonicalSkillId: undefined,
     forkOf: undefined,
     latestVersionId: params.latestVersion ? `local-version:${params.slug}:${params.latestVersion}` : undefined,
-    tags: Object.fromEntries((params.tags ?? []).map((tag) => [tag, params.latestVersion ?? "local"])),
+    tags: params.versionTags ?? {},
+    labels: params.labels ?? [],
     badges: {},
     stats: {
       stars: params.stats?.stars ?? 0,
@@ -829,6 +871,15 @@ function toPublicSkill(params: {
 function normalizeStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
+}
+
+function normalizeTagMap(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).filter(
+      (entry): entry is [string, string] => typeof entry[0] === "string" && typeof entry[1] === "string",
+    ),
+  );
 }
 
 function normalizeStats(value: unknown) {

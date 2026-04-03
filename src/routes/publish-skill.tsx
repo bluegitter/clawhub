@@ -27,6 +27,7 @@ import {
   readText,
   uploadFile,
 } from "./upload/-utils";
+import { LabelChipInput } from "../components/LabelChipInput";
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -77,6 +78,7 @@ export function Upload() {
   const [displayName, setDisplayName] = useState("");
   const [version, setVersion] = useState("1.0.0");
   const [tags, setTags] = useState("latest");
+  const [labels, setLabels] = useState<string[]>([]);
   const [acceptedLicenseTerms, setAcceptedLicenseTerms] = useState(false);
   const [changelog, setChangelog] = useState("");
   const [changelogStatus, setChangelogStatus] = useState<"idle" | "loading" | "ready" | "error">(
@@ -230,6 +232,7 @@ export function Upload() {
         setSlug(result.skill.slug);
         setLocalExistingSlug(result.skill.slug);
         setDisplayName(result.skill.displayName);
+        setLabels(result.skill.labels ?? []);
         const nextVersion = result.version && semver.valid(result.version)
           ? semver.inc(result.version, "patch")
           : null;
@@ -347,6 +350,10 @@ export function Upload() {
         .map((tag) => tag.trim())
         .filter(Boolean),
     [tags],
+  );
+  const parsedLabels = useMemo(
+    () => labels.map((label) => label.trim()).filter(Boolean),
+    [labels],
   );
   const validation = useMemo(() => {
     const issues: string[] = [];
@@ -474,6 +481,7 @@ export function Upload() {
           version,
           changelog: trimmedChangelog,
           tags: parsedTags,
+          labels: parsedLabels,
           files: files.map((file) => {
             const rawPath = (file.webkitRelativePath || file.name).replace(/^\.\//, "");
             const path =
@@ -521,6 +529,7 @@ export function Upload() {
           changelog: trimmedChangelog,
           acceptLicenseTerms: isSoulMode ? undefined : acceptedLicenseTerms,
           tags: parsedTags,
+          labels: parsedLabels,
           files: uploaded,
         });
       }
@@ -621,7 +630,7 @@ export function Upload() {
           />
 
           <label className="form-label" htmlFor="tags">
-            Tags
+            Version tags
           </label>
           <input
             className="form-input"
@@ -629,6 +638,15 @@ export function Upload() {
             value={tags}
             onChange={(event) => setTags(event.target.value)}
             placeholder="latest, stable"
+          />
+
+          <label className="form-label" htmlFor="labels">
+            Skill labels
+          </label>
+          <LabelChipInput
+            labels={labels}
+            onChange={setLabels}
+            placeholder="ops, browser, automation"
           />
         </div>
 

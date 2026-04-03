@@ -339,6 +339,16 @@ async function ensureLocalSchema(db: DB) {
   `));
 
   await db.execute(sql.raw(`
+    CREATE TABLE IF NOT EXISTS skill_labels (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      skill_id uuid NOT NULL REFERENCES skills(id) ON DELETE cascade,
+      label text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      CONSTRAINT idx_skill_labels_skill_label_unique UNIQUE (skill_id, label)
+    );
+  `));
+
+  await db.execute(sql.raw(`
     CREATE TABLE IF NOT EXISTS skill_version_tags (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       skill_id uuid NOT NULL REFERENCES skills(id) ON DELETE cascade,
@@ -378,6 +388,8 @@ async function ensureLocalSchema(db: DB) {
   await db.execute(sql.raw(`CREATE INDEX IF NOT EXISTS idx_sv_skill_version ON skill_versions(skill_id, version);`));
   await db.execute(sql.raw(`CREATE INDEX IF NOT EXISTS idx_sv_skill ON skill_versions(skill_id);`));
   await db.execute(sql.raw(`CREATE INDEX IF NOT EXISTS idx_sf_version ON skill_files(version_id);`));
+  await db.execute(sql.raw(`CREATE INDEX IF NOT EXISTS idx_skill_labels_label ON skill_labels(label);`));
+  await db.execute(sql.raw(`CREATE INDEX IF NOT EXISTS idx_skill_labels_skill ON skill_labels(skill_id);`));
   await db.execute(sql.raw(`CREATE INDEX IF NOT EXISTS idx_svt_version ON skill_version_tags(version_id);`));
   await db.execute(sql.raw(`CREATE INDEX IF NOT EXISTS idx_svt_skill ON skill_version_tags(skill_id);`));
   await db.execute(sql.raw(`CREATE INDEX IF NOT EXISTS idx_skill_aliases_target_skill ON skill_aliases(target_skill_id);`));

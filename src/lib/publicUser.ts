@@ -27,7 +27,9 @@ export type PublicSkill = Pick<
   | "stats"
   | "createdAt"
   | "updatedAt"
->;
+> & {
+  labels?: string[];
+};
 
 export type PublicSoul = Pick<
   Doc<"souls">,

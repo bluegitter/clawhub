@@ -1,71 +1,77 @@
 import { eq, desc, sql } from "drizzle-orm";
 import { getDb } from "../db/index";
-import { skills, skillEmbeddings, users } from "../db/schema/index";
+import { skillEmbeddings, skillLabels, skills, users } from "../db/schema/index";
 import { OPENAI_API_KEY } from "../db/env";
 
-export async function searchSkills(query: string, limit: number) {
-  const db = getDb();
+export async function searchSkills(query: string, limit: number, options?: { label?: string | null }) {
+  const normalizedLabel = options?.label?.trim().toLowerCase() || null;
 
   if (!query.trim()) {
-    return db
-      .select({
-        id: skills.id,
-        slug: skills.slug,
-        name: skills.name,
-        summary: skills.summary,
-        latestVersion: skills.latestVersion,
-        tags: skills.tags,
-        updatedAt: skills.updatedAt,
-        ownerHandle: users.username,
-        ownerDisplayName: users.realName,
-        ownerImage: users.image,
-      })
-      .from(skills)
-      .innerJoin(users, eq(skills.ownerId, users.id))
-      .where(eq(skills.visibility, "public"))
-      .orderBy(desc(skills.updatedAt))
-      .limit(limit);
+    return lexicalSearch("", limit, { label: normalizedLabel });
   }
 
   const normalizedQuery = query.trim().toLowerCase();
-  const lexicalRows = await lexicalSearch(normalizedQuery, limit);
+  const lexicalRows = await lexicalSearch(normalizedQuery, limit, { label: normalizedLabel });
 
   if (lexicalRows.length > 0) {
     return lexicalRows;
   }
 
   const vectorRows =
-    query.trim().length > 2 && OPENAI_API_KEY ? await vectorSearch(query, limit) : [];
+    query.trim().length > 2 && OPENAI_API_KEY ? await vectorSearch(query, limit, { label: normalizedLabel }) : [];
 
   return mergeSearchResults([], vectorRows, limit);
 }
 
-async function lexicalSearch(query: string, limit: number) {
+async function lexicalSearch(query: string, limit: number, options?: { label?: string | null }) {
   const db = getDb();
-  const rows = await db
-    .select({
-      id: skills.id,
-      slug: skills.slug,
-      name: skills.name,
-      summary: skills.summary,
-      latestVersion: skills.latestVersion,
-      tags: skills.tags,
-      updatedAt: skills.updatedAt,
-      ownerHandle: users.username,
-      ownerDisplayName: users.realName,
-      ownerImage: users.image,
-    })
-    .from(skills)
-    .innerJoin(users, eq(skills.ownerId, users.id))
-    .where(eq(skills.visibility, "public"))
-    .orderBy(desc(skills.updatedAt));
+  const normalizedLabel = options?.label ?? null;
+  const rows = await (normalizedLabel
+    ? db
+        .select({
+          id: skills.id,
+          slug: skills.slug,
+          name: skills.name,
+          summary: skills.summary,
+          latestVersion: skills.latestVersion,
+          labels: sql<string[]>`coalesce(array_agg(distinct ${skillLabels.label}) filter (where ${skillLabels.label} is not null), ARRAY[]::text[])`,
+          updatedAt: skills.updatedAt,
+          ownerHandle: users.username,
+          ownerDisplayName: users.realName,
+          ownerImage: users.image,
+        })
+        .from(skills)
+        .innerJoin(users, eq(skills.ownerId, users.id))
+        .innerJoin(skillLabels, eq(skillLabels.skillId, skills.id))
+        .where(sql`${skills.visibility} = 'public' and ${skillLabels.label} = ${normalizedLabel}`)
+        .groupBy(skills.id, users.username, users.realName, users.image)
+        .orderBy(desc(skills.updatedAt))
+    : db
+        .select({
+          id: skills.id,
+          slug: skills.slug,
+          name: skills.name,
+          summary: skills.summary,
+          latestVersion: skills.latestVersion,
+          labels: sql<string[]>`coalesce(array_agg(distinct ${skillLabels.label}) filter (where ${skillLabels.label} is not null), ARRAY[]::text[])`,
+          updatedAt: skills.updatedAt,
+          ownerHandle: users.username,
+          ownerDisplayName: users.realName,
+          ownerImage: users.image,
+        })
+        .from(skills)
+        .innerJoin(users, eq(skills.ownerId, users.id))
+        .leftJoin(skillLabels, eq(skillLabels.skillId, skills.id))
+        .where(eq(skills.visibility, "public"))
+        .groupBy(skills.id, users.username, users.realName, users.image)
+        .orderBy(desc(skills.updatedAt)));
 
   const matches = rows
     .map((row) => {
       const slug = row.slug.toLowerCase();
       const name = row.name.toLowerCase();
       const summary = row.summary?.toLowerCase() ?? "";
-      const tags = Array.isArray(row.tags) ? row.tags.map((tag) => tag.toLowerCase()) : [];
+      const tags = Array.isArray(row.labels) ? row.labels.map((tag) => tag.toLowerCase()) : [];
       const score = computeLexicalScore({
         query,
         slug,
@@ -82,7 +88,7 @@ async function lexicalSearch(query: string, limit: number) {
         name: row.name,
         summary: row.summary,
         latestVersion: row.latestVersion,
-        tags: row.tags,
+        labels: row.labels,
         updatedAt: row.updatedAt,
         ownerHandle: row.ownerHandle,
         ownerDisplayName: row.ownerDisplayName,
@@ -100,7 +106,7 @@ async function lexicalSearch(query: string, limit: number) {
   return matches;
 }
 
-async function vectorSearch(query: string, limit: number) {
+async function vectorSearch(query: string, limit: number, options?: { label?: string | null }) {
   const embedding = await generateEmbedding(query);
   if (!embedding) return [];
 
@@ -111,7 +117,7 @@ async function vectorSearch(query: string, limit: number) {
     name: string;
     summary: string | null;
     latest_version: string | null;
-    tags: string[] | null;
+    labels: string[] | null;
     updated_at: Date;
     owner_handle: string | null;
     owner_display_name: string | null;
@@ -119,14 +125,20 @@ async function vectorSearch(query: string, limit: number) {
     distance: number;
   };
   const vecStr = JSON.stringify(embedding);
+  const labelFilter = options?.label?.trim().toLowerCase() || null;
   const result = await db.execute<VectorRow>(sql`
-    SELECT s.id, s.slug, s.name, s.summary, s.latest_version, s.tags, s.updated_at,
+    SELECT s.id, s.slug, s.name, s.summary, s.latest_version,
+      coalesce(array_agg(distinct sl.label) filter (where sl.label is not null), ARRAY[]::text[]) as labels,
+      s.updated_at,
       u.username as owner_handle, u.real_name as owner_display_name, u.image as owner_image,
       se.embedding <=> ${vecStr}::vector AS distance
     FROM skills s
     JOIN skill_embeddings se ON se.skill_id = s.id
     JOIN users u ON u.id = s.owner_id
+    LEFT JOIN skill_labels sl ON sl.skill_id = s.id
     WHERE s.visibility = 'public'
+      ${labelFilter ? sql`AND EXISTS (SELECT 1 FROM skill_labels slf WHERE slf.skill_id = s.id AND slf.label = ${labelFilter})` : sql``}
+    GROUP BY s.id, u.username, u.real_name, u.image, se.embedding
     ORDER BY se.embedding <=> ${vecStr}::vector
     LIMIT ${limit}
   `);
@@ -140,7 +152,7 @@ interface SearchHit {
   summary: string | null;
   latestVersion?: string | null;
   latest_version?: string | null;
-  tags?: string[] | null;
+  labels?: string[] | null;
   updatedAt?: Date | null;
   updated_at?: Date;
   ownerHandle?: string | null;
@@ -162,7 +174,7 @@ function mergeSearchResults(fulltext: SearchHit[], vector: SearchHit[], limit: n
     name: string;
     summary: string | null;
     latestVersion: string | null;
-    tags: string[] | null;
+    labels: string[] | null;
     updatedAt: Date | null;
     ownerHandle: string | null;
     ownerDisplayName: string | null;
@@ -179,7 +191,7 @@ function mergeSearchResults(fulltext: SearchHit[], vector: SearchHit[], limit: n
         name: row.name,
         summary: row.summary,
         latestVersion: row.latestVersion ?? row.latest_version ?? null,
-        tags: row.tags ?? null,
+        labels: row.labels ?? null,
         updatedAt: row.updatedAt ?? row.updated_at ?? null,
         ownerHandle: row.ownerHandle ?? row.owner_handle ?? null,
         ownerDisplayName: row.ownerDisplayName ?? row.owner_display_name ?? null,
@@ -198,7 +210,7 @@ function mergeSearchResults(fulltext: SearchHit[], vector: SearchHit[], limit: n
         name: row.name,
         summary: row.summary,
         latestVersion: row.latest_version ?? null,
-        tags: row.tags ?? null,
+        labels: row.labels ?? null,
         updatedAt: row.updated_at ?? null,
         ownerHandle: row.ownerHandle ?? row.owner_handle ?? null,
         ownerDisplayName: row.ownerDisplayName ?? row.owner_display_name ?? null,

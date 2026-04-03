@@ -4,6 +4,7 @@ import {
   skills,
   skillVersions,
   skillFiles,
+  skillLabels,
   users,
   stars,
   skillEmbeddings,
@@ -14,35 +15,62 @@ import { deleteVersionDir, getFile, storeFile } from "../storage/index";
 import { generateEmbedding, storeEmbedding } from "./search";
 import type { User } from "../db/schema/users";
 
-export async function listSkills(cursor: string | null, limit: number) {
+export async function listSkills(cursor: string | null, limit: number, options?: { label?: string | null }) {
   const db = getDb();
+  const normalizedLabel = options?.label?.trim().toLowerCase() || null;
   const [rows, countRow] = await Promise.all([
-    db
-    .select({
-      id: skills.id,
-      slug: skills.slug,
-      displayName: skills.name,
-      summary: skills.summary,
-      latestVersion: skills.latestVersion,
-      tags: skills.tags,
-      createdAt: skills.createdAt,
-      updatedAt: skills.updatedAt,
-      ownerHandle: users.username,
-      ownerDisplayName: users.realName,
-      ownerImage: users.image,
-    })
-    .from(skills)
-    .innerJoin(users, eq(skills.ownerId, users.id))
-    .where(eq(skills.visibility, "public"))
-    .orderBy(desc(skills.updatedAt))
-    .limit(Math.max(limit, 1)),
-    db
-      .select({ count: sql<number>`cast(count(*) as int)` })
-      .from(skills)
-      .where(eq(skills.visibility, "public")),
+    normalizedLabel
+      ? db
+          .select({
+            id: skills.id,
+            slug: skills.slug,
+            displayName: skills.name,
+            summary: skills.summary,
+            latestVersion: skills.latestVersion,
+            tags: skills.tags,
+            createdAt: skills.createdAt,
+            updatedAt: skills.updatedAt,
+            ownerHandle: users.username,
+            ownerDisplayName: users.realName,
+            ownerImage: users.image,
+          })
+          .from(skills)
+          .innerJoin(users, eq(skills.ownerId, users.id))
+          .innerJoin(skillLabels, eq(skillLabels.skillId, skills.id))
+          .where(and(eq(skills.visibility, "public"), eq(skillLabels.label, normalizedLabel)))
+          .orderBy(desc(skills.updatedAt))
+      : db
+          .select({
+            id: skills.id,
+            slug: skills.slug,
+            displayName: skills.name,
+            summary: skills.summary,
+            latestVersion: skills.latestVersion,
+            tags: skills.tags,
+            createdAt: skills.createdAt,
+            updatedAt: skills.updatedAt,
+            ownerHandle: users.username,
+            ownerDisplayName: users.realName,
+            ownerImage: users.image,
+          })
+          .from(skills)
+          .innerJoin(users, eq(skills.ownerId, users.id))
+          .where(eq(skills.visibility, "public"))
+          .orderBy(desc(skills.updatedAt)),
+    normalizedLabel
+      ? db
+          .select({ count: sql<number>`cast(count(*) as int)` })
+          .from(skills)
+          .innerJoin(skillLabels, eq(skillLabels.skillId, skills.id))
+          .where(and(eq(skills.visibility, "public"), eq(skillLabels.label, normalizedLabel)))
+      : db
+          .select({ count: sql<number>`cast(count(*) as int)` })
+          .from(skills)
+          .where(eq(skills.visibility, "public")),
   ]);
 
   const statsBySkillId = await getSkillStatsMap(rows.map((row) => row.id));
+  const labelsBySkillId = await loadSkillLabelsMap(rows.map((row) => row.id));
 
   const startIndex = decodeCursor(cursor);
   const page = rows.slice(startIndex, startIndex + limit);
@@ -55,6 +83,7 @@ export async function listSkills(cursor: string | null, limit: number) {
       displayName: row.displayName,
       summary: row.summary,
       tags: toTagMap(row.tags, row.latestVersion),
+      labels: labelsBySkillId.get(row.id) ?? [],
       stats: statsBySkillId.get(row.id) ?? defaultSkillStats(),
       createdAt: row.createdAt.getTime(),
       updatedAt: row.updatedAt.getTime(),
@@ -85,6 +114,7 @@ export async function getSkillBySlug(slug: string) {
   const owner = await db.query.users.findFirst({ where: eq(users.id, skill.ownerId) });
   const statsBySkillId = await getSkillStatsMap([skill.id]);
   const stats = statsBySkillId.get(skill.id) ?? defaultSkillStats();
+  const labels = await loadSkillLabels(skill.id);
 
   const versions = await db
     .select({
@@ -109,6 +139,7 @@ export async function getSkillBySlug(slug: string) {
       displayName: skill.name,
       summary: skill.summary,
       tags: Object.keys(tagMap).length > 0 ? tagMap : toTagMap(skill.tags, skill.latestVersion),
+      labels,
       stats,
       createdAt: skill.createdAt.getTime(),
       updatedAt: skill.updatedAt.getTime(),
@@ -341,11 +372,13 @@ export async function publishSkill(
     version: string;
     changelog?: string;
     tags?: string[];
+    labels?: string[];
   },
   files: Array<{ filename: string; data: Buffer }>,
 ) {
   const db = getDb();
-  const normalizedTags = normalizeTags(payload.tags, { fallbackToLatest: true });
+  const normalizedTags = normalizeVersionTags(payload.tags, { fallbackToLatest: true });
+  const normalizedLabels = normalizeSkillLabels(payload.labels);
   const readmeFile = files.find((file) => {
     const lower = file.filename.trim().toLowerCase();
     return lower === "skill.md" || lower === "skills.md";
@@ -430,6 +463,7 @@ export async function publishSkill(
   }
 
   await replaceTagsForVersion(skill.id, versionRow.id, normalizedTags);
+  await replaceSkillLabels(skill.id, normalizedLabels);
 
   generateEmbeddingForSkill(skill.id, files).catch((err) =>
     console.error("Background embedding generation failed:", err),
@@ -459,6 +493,7 @@ export async function deleteSkill(user: User, slug: string) {
 
   await db.delete(stars).where(eq(stars.skillId, skill.id));
   await db.delete(skillEmbeddings).where(eq(skillEmbeddings.skillId, skill.id));
+  await db.delete(skillLabels).where(eq(skillLabels.skillId, skill.id));
   await db.delete(skillVersionTags).where(eq(skillVersionTags.skillId, skill.id));
   await db.delete(skillAliases).where(eq(skillAliases.targetSkillId, skill.id));
   for (const version of versions) {
@@ -546,12 +581,27 @@ export async function setSkillVersionTags(user: User, slug: string, version: str
   });
   if (!versionRow) throw new Error("Skill version not found");
 
-  const normalizedTags = normalizeTags(tags, { fallbackToLatest: false });
+  const normalizedTags = normalizeVersionTags(tags, { fallbackToLatest: false });
   await replaceTagsForVersion(skill.id, versionRow.id, normalizedTags);
 
   return {
     ok: true as const,
     tags: await loadSkillTagMap(skill.id),
+  };
+}
+
+export async function setSkillLabels(user: User, slug: string, labels: string[]) {
+  const resolved = await resolveSkillRecord(slug);
+  const skill = resolved?.skill ?? null;
+  if (!skill) throw new Error("Skill not found");
+  if (skill.ownerId !== user.id) throw new Error("You do not own this skill");
+
+  const normalizedLabels = normalizeSkillLabels(labels);
+  await replaceSkillLabels(skill.id, normalizedLabels);
+
+  return {
+    ok: true as const,
+    labels: await loadSkillLabels(skill.id),
   };
 }
 
@@ -600,6 +650,40 @@ async function listSkillTagNames(skillId: string) {
   return Object.keys(tagMap);
 }
 
+async function loadSkillLabelsMap(skillIds: string[]) {
+  const normalized = Array.from(new Set(skillIds.filter(Boolean)));
+  const map = new Map<string, string[]>();
+  if (normalized.length === 0) return map;
+
+  const db = getDb();
+  const rows = await db
+    .select({
+      skillId: skillLabels.skillId,
+      label: skillLabels.label,
+    })
+    .from(skillLabels)
+    .where(inArray(skillLabels.skillId, normalized));
+
+  for (const skillId of normalized) {
+    map.set(skillId, []);
+  }
+  for (const row of rows) {
+    if (!row.label) continue;
+    const current = map.get(row.skillId) ?? [];
+    current.push(row.label);
+    map.set(row.skillId, current);
+  }
+  for (const [skillId, labels] of map.entries()) {
+    map.set(skillId, labels.sort((a, b) => a.localeCompare(b)));
+  }
+  return map;
+}
+
+async function loadSkillLabels(skillId: string) {
+  const map = await loadSkillLabelsMap([skillId]);
+  return map.get(skillId) ?? [];
+}
+
 async function replaceTagsForVersion(skillId: string, versionId: string, tags: string[]) {
   const db = getDb();
   await db
@@ -627,6 +711,38 @@ async function replaceTagsForVersion(skillId: string, versionId: string, tags: s
       updatedAt: new Date(),
     })
     .where(eq(skills.id, skillId));
+}
+
+async function replaceSkillLabels(skillId: string, labels: string[]) {
+  const db = getDb();
+  await db.delete(skillLabels).where(eq(skillLabels.skillId, skillId));
+  if (labels.length > 0) {
+    await db.insert(skillLabels).values(
+      labels.map((label) => ({
+        skillId,
+        label,
+      })),
+    );
+  }
+}
+
+export async function listAvailableSkillLabels() {
+  const db = getDb();
+  const rows = await db
+    .select({
+      label: skillLabels.label,
+      count: sql<number>`cast(count(*) as int)`,
+    })
+    .from(skillLabels)
+    .innerJoin(skills, eq(skills.id, skillLabels.skillId))
+    .where(eq(skills.visibility, "public"))
+    .groupBy(skillLabels.label)
+    .orderBy(skillLabels.label);
+
+  return rows.map((row) => ({
+    label: row.label,
+    count: Number(row.count ?? 0),
+  }));
 }
 
 function defaultSkillStats() {
@@ -736,7 +852,7 @@ function normalizeSummaryLine(line: string) {
     .trim();
 }
 
-function normalizeTags(tags: string[] | undefined, options: { fallbackToLatest: boolean }) {
+function normalizeVersionTags(tags: string[] | undefined, options: { fallbackToLatest: boolean }) {
   const normalized = Array.from(
     new Set(
       (tags ?? [])
@@ -746,4 +862,14 @@ function normalizeTags(tags: string[] | undefined, options: { fallbackToLatest: 
   );
   if (normalized.length > 0) return normalized;
   return options.fallbackToLatest ? ["latest"] : [];
+}
+
+function normalizeSkillLabels(labels: string[] | undefined) {
+  return Array.from(
+    new Set(
+      (labels ?? [])
+        .map((label) => label.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  );
 }

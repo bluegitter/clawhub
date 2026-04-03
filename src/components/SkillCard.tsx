@@ -26,7 +26,8 @@ export function SkillCard({
   const owner = encodeURIComponent(String(skill.ownerUserId));
   const link = href ?? `/${owner}/${skill.slug}`;
   const badges = Array.isArray(badge) ? badge : badge ? [badge] : [];
-  const hasTags = badges.length || chip || platformLabels?.length;
+  const labels = skill.labels ?? [];
+  const hasTags = badges.length || chip || platformLabels?.length || labels.length;
 
   return (
     <article className="card skill-card">
@@ -42,6 +43,11 @@ export function SkillCard({
           {platformLabels?.map((label) => (
             <div key={label} className="tag tag-compact">
               {label}
+            </div>
+          ))}
+          {labels.map((label) => (
+            <div key={label} className="tag tag-compact">
+              #{label}
             </div>
           ))}
         </div>

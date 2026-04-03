@@ -2124,18 +2124,53 @@ code {
 
 .skill-owner-tools {
   display: grid;
-  gap: 14px;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.skill-owner-tools .section-title {
+  margin-bottom: 0;
+  font-size: 1.1rem;
+}
+
+.skill-owner-tools-subtitle {
+  margin: 0;
+  font-size: 0.88rem;
 }
 
 .skill-owner-tools-grid {
   display: grid;
-  gap: 14px;
-  grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr);
+  gap: 10px;
+}
+
+.skill-owner-tool-row {
+  display: grid;
+  gap: 10px;
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr) 180px;
+}
+
+.skill-owner-tool-field {
+  min-width: 0;
+}
+
+.skill-owner-tool-action {
+  align-content: start;
+}
+
+.skill-owner-tool-action .management-action-btn {
+  min-height: 40px;
+  width: 100%;
+  justify-content: center;
 }
 
 @media (max-width: 820px) {
-  .skill-owner-tools-grid {
+  .skill-owner-tool-row {
     grid-template-columns: 1fr;
+  }
+
+  .skill-owner-tool-action .management-action-btn {
+    width: 100%;
   }
 }
 
@@ -2389,6 +2424,54 @@ code {
 
 .tag-delete:hover {
   opacity: 1;
+}
+
+.label-chip-input {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  box-sizing: border-box;
+  border: 1px solid rgba(29, 59, 78, 0.22);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.label-chip-input:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 70%, white);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.label-chip-input.is-disabled {
+  opacity: 0.7;
+}
+
+.label-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.label-chip-field {
+  min-width: 120px;
+  flex: 1 1 140px;
+  border: 0;
+  outline: none;
+  padding: 4px 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.label-chip-field::placeholder {
+  color: var(--ink-soft);
+}
+
+[data-theme="dark"] .label-chip-input {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(14, 28, 37, 0.84);
 }
 
 .tag-form {
@@ -4023,7 +4106,7 @@ html.theme-transition::view-transition-new(theme) {
 
 .management-control-stack {
   display: grid;
-  gap: 6px;
+  gap: 4px;
   align-items: stretch;
   min-width: 0;
 }
@@ -4127,11 +4210,11 @@ html.theme-transition::view-transition-new(theme) {
 .management-field {
   width: 100%;
   min-width: 0;
-  min-height: 44px;
+  min-height: 40px;
   box-sizing: border-box;
   border: 1px solid rgba(29, 59, 78, 0.22);
   border-radius: var(--radius-sm);
-  padding: 10px 12px;
+  padding: 8px 10px;
   color: var(--ink);
   background: rgba(255, 255, 255, 0.94);
 }
@@ -4151,9 +4234,9 @@ html.theme-transition::view-transition-new(theme) {
 
 .management-action-btn {
   justify-content: center;
-  min-height: 42px;
-  width: 100%;
+  min-height: 40px;
   box-sizing: border-box;
+  padding: 8px 12px;
 }
 
 .management-textarea {

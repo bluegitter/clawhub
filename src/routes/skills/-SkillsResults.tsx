@@ -124,6 +124,15 @@ export function SkillsResults({
                 </Link>
                 <span className="skills-table-summary">
                   {skill.summary ?? t("skills.noSummary")}
+                  {skill.labels?.length ? (
+                    <span className="skill-card-tags" style={{ marginTop: 6, display: "flex" }}>
+                      {skill.labels.map((label) => (
+                        <span key={label} className="tag tag-compact">
+                          #{label}
+                        </span>
+                      ))}
+                    </span>
+                  ) : null}
                 </span>
                 <span className="skills-table-author">
                   <UserBadge

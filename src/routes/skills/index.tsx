@@ -10,6 +10,7 @@ export const Route = createFileRoute("/skills/")({
   validateSearch: (search): SkillsSearchState => {
     return {
       q: typeof search.q === "string" && search.q.trim() ? search.q : undefined,
+      label: typeof search.label === "string" && search.label.trim() ? search.label.trim().toLowerCase() : undefined,
       sort: typeof search.sort === "string" ? parseSort(search.sort) : undefined,
       dir: search.dir === "asc" || search.dir === "desc" ? search.dir : undefined,
       highlighted:
@@ -33,6 +34,7 @@ export const Route = createFileRoute("/skills/")({
       to: "/skills",
       search: {
         q: search.q || undefined,
+        label: search.label || undefined,
         sort: "downloads",
         dir: search.dir || undefined,
         highlighted: search.highlighted || undefined,
@@ -79,6 +81,8 @@ export function SkillsIndex() {
         <SkillsToolbar
           searchInputRef={searchInputRef}
           query={model.query}
+          activeLabel={model.activeLabel}
+          availableLabels={model.availableLabels}
           hasQuery={model.hasQuery}
           sort={model.sort}
           dir={model.dir}
@@ -86,6 +90,7 @@ export function SkillsIndex() {
           highlightedOnly={model.highlightedOnly}
           nonSuspiciousOnly={model.nonSuspiciousOnly}
           onQueryChange={model.onQueryChange}
+          onLabelChange={model.onLabelChange}
           onToggleHighlighted={model.onToggleHighlighted}
           onToggleNonSuspicious={model.onToggleNonSuspicious}
           onSortChange={model.onSortChange}

@@ -11,6 +11,8 @@ import {
   deleteSkillVersion,
   renameSkill,
   setSkillVersionTags,
+  setSkillLabels,
+  listAvailableSkillLabels,
   getFileForVersion,
   getVersionArchive,
 } from "../../services/skill";
@@ -28,8 +30,14 @@ function toResponseBody(data: Uint8Array | Buffer) {
 app.get("/", optionalAuth, async (c) => {
   const cursor = c.req.query("cursor") ?? null;
   const limit = Math.min(parseInt(c.req.query("limit") ?? String(DEFAULT_PAGE_SIZE)), 100);
-  const result = await listSkills(cursor, limit);
+  const label = c.req.query("label")?.trim() ?? null;
+  const result = await listSkills(cursor, limit, { label });
   return c.json(result);
+});
+
+app.get("/labels", optionalAuth, async (c) => {
+  const result = await listAvailableSkillLabels();
+  return c.json({ items: result });
 });
 
 app.get("/:slug/availability", optionalAuth, async (c) => {
@@ -146,6 +154,7 @@ app.post("/", requireAuth, async (c) => {
     version: string;
     changelog?: string;
     tags?: string[];
+    labels?: string[];
   };
   try {
     payload = JSON.parse(payloadStr);
@@ -260,6 +269,31 @@ app.put("/:slug/versions/:version/tags", requireAuth, async (c) => {
     const message = err instanceof Error ? err.message : "Update tags failed";
     const status =
       message === "Skill not found" || message === "Skill version not found"
+        ? 404
+        : message === "You do not own this skill"
+          ? 403
+          : 400;
+    return c.json({ error: message }, status);
+  }
+});
+
+app.put("/:slug/labels", requireAuth, async (c) => {
+  const user = c.get("user");
+  const slug = c.req.param("slug");
+  let body: { labels?: string[] };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
+
+  try {
+    const result = await setSkillLabels(user, slug, Array.isArray(body.labels) ? body.labels : []);
+    return c.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Update labels failed";
+    const status =
+      message === "Skill not found"
         ? 404
         : message === "You do not own this skill"
           ? 403
