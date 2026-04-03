@@ -1,53 +1,53 @@
 ---
-summary: "Deployment runbook for the existing self-hosted installation on 192.168.63.50, including all issues encountered during rollout."
+summary: "192.168.63.50 现有自部署实例的部署运行手册，包含本次上线过程中遇到的全部问题。"
 read_when:
-  - Reproducing or repairing the deployment on 192.168.63.50
-  - Understanding why the current ports/env/runtime look the way they do
-  - Debugging regressions after resyncing the repo to the server
+  - 需要在 192.168.63.50 上重建或修复部署时
+  - 需要理解当前端口、环境变量和运行方式为何如此配置时
+  - 重新同步仓库到服务器后，需要排查回归问题时
 ---
 
-# ClawHub Deployment Record: `192.168.63.50`
+# ClawHub 部署记录：`192.168.63.50`
 
-This document is not a generic deployment guide.  
-It is the actual deployment runbook for the current server:
+这不是一份通用部署文档。  
+它是当前这台服务器的真实部署运行手册：
 
-- server: `192.168.63.50`
-- install dir: `/opt/clawhub`
-- backend: `http://192.168.63.50:3001`
-- UI: `http://192.168.63.50:3003`
+- 服务器：`192.168.63.50`
+- 安装目录：`/opt/clawhub`
+- 后端：`http://192.168.63.50:3001`
+- UI：`http://192.168.63.50:3003`
 
-Use this document when you need to rebuild, repair, or re-sync this specific machine.
+当你需要重建、修复或重新同步这台机器时，应优先使用这份文档。
 
-## Final architecture
+## 最终架构
 
-- source code synced from local workspace to `/opt/clawhub`
-- app dependencies installed inside Docker using `node:22-bookworm`
-- backend started by `systemd` via Docker
-- UI started by `systemd` via Docker
-- database is the repo's embedded PostgreSQL cluster under `/opt/clawhub/data/pg`
-- uploaded skill files live in `/opt/clawhub/data/storage`
-- SSO is enabled and the app entry URL is `http://192.168.63.50:3003`
+- 源码从本地工作区同步到 `/opt/clawhub`
+- 应用依赖通过 Docker 内的 `node:22-bookworm` 安装
+- 后端由 `systemd` 通过 Docker 启动
+- UI 由 `systemd` 通过 Docker 启动
+- 数据库使用仓库自带的 embedded PostgreSQL 集群，目录在 `/opt/clawhub/data/pg`
+- 上传的 skill 文件存放在 `/opt/clawhub/data/storage`
+- 已启用 SSO，应用入口地址为 `http://192.168.63.50:3003`
 
-## Final ports
+## 最终端口
 
-- `3001`: local backend
-- `3003`: UI
+- `3001`：本地后端
+- `3003`：UI
 
-These are not arbitrary.
+这些端口不是随意选的。
 
-During deployment we confirmed:
+部署过程中确认过：
 
-- `3000` was already occupied by `chatbot-app`
-- `3002` was already occupied by `smart-bi-app`
+- `3000` 已经被 `chatbot-app` 占用
+- `3002` 已经被 `smart-bi-app` 占用
 
-So the usable pair became:
+因此最终可用组合变成：
 
-- backend `3001`
+- 后端 `3001`
 - UI `3003`
 
-## Final `.env`
+## 最终 `.env`
 
-The deployed server must keep these values in `/opt/clawhub/.env`:
+部署服务器上的 `/opt/clawhub/.env` 必须保留以下值：
 
 ```env
 SSO_BASE_URL=http://192.168.63.22:8091
@@ -66,19 +66,19 @@ CORS_ALLOWED_ORIGINS=http://192.168.63.50:3003,http://192.168.63.50:3001,http://
 REDIRECT_ALLOWED_ORIGINS=http://192.168.63.50:3003,http://localhost:3000
 ```
 
-## Why the deployment uses Docker
+## 为什么部署方案使用 Docker
 
-The host is an older Linux environment. During rollout we confirmed:
+宿主机是较老的 Linux 环境。部署过程中确认：
 
-- host OS was suitable for Docker + systemd
-- host Node.js was too old for this repo
+- 宿主机操作系统适合运行 Docker + systemd
+- 宿主机自带的 Node.js 版本不适合当前仓库
 
-So we did not run the app with the host Node.  
-Instead both backend and UI run inside `node:22-bookworm`.
+所以没有直接用宿主机 Node 跑服务。  
+后端和 UI 都统一运行在 `node:22-bookworm` 容器内。
 
-## Code sync command
+## 代码同步命令
 
-This was the working repo sync method:
+这次实际可用的仓库同步方式如下：
 
 ```bash
 ssh 192.168.63.50 'mkdir -p /opt/clawhub'
@@ -86,14 +86,14 @@ tar --exclude=.git --exclude=node_modules --exclude=.vite --exclude=.output --ex
   | ssh 192.168.63.50 'cd /opt/clawhub && tar xf -'
 ```
 
-Important:
+注意：
 
-- this command can overwrite `/opt/clawhub/.env` with local values
-- it can also disturb ownership/mode under `/opt/clawhub/data`
+- 这个命令可能会用本地值覆盖 `/opt/clawhub/.env`
+- 也可能破坏 `/opt/clawhub/data` 下文件的 owner 或权限
 
-That happened more than once during this deployment.
+这两个问题在本次部署中都不止出现过一次。
 
-## Dependency install command
+## 依赖安装命令
 
 ```bash
 ssh 192.168.63.50 '
@@ -106,9 +106,9 @@ ssh 192.168.63.50 '
 '
 ```
 
-## systemd services in use
+## 当前使用的 systemd 服务
 
-Backend:
+后端：
 
 ```ini
 [Unit]
@@ -129,7 +129,7 @@ ExecStop=/usr/bin/docker stop clawhub-local-backend
 WantedBy=multi-user.target
 ```
 
-UI:
+UI：
 
 ```ini
 [Unit]
@@ -150,212 +150,213 @@ ExecStop=/usr/bin/docker stop clawhub-local-ui
 WantedBy=multi-user.target
 ```
 
-## Data migration strategy actually used
+## 实际使用的数据迁移策略
 
-### What worked
+### 有效的方法
 
-- migrated `data/storage`
-- exported database content logically
-- re-imported into a fresh Linux-native cluster
+- 迁移 `data/storage`
+- 通过逻辑导出方式导出数据库内容
+- 在 Linux 原生新库中重新导入
 
-### What did not work
+### 无效的方法
 
-Directly copying local macOS `data/pg` to Linux failed.
+直接把本地 macOS 的 `data/pg` 拷贝到 Linux 上不可行。
 
-That was a real deployment blocker.
+这是本次部署中的一个真实阻塞点。
 
-Root causes:
+根因：
 
-- embedded PostgreSQL cluster files were not portable as copied
-- Linux locale settings differed
-- config values generated on one environment were invalid on the other
+- embedded PostgreSQL 集群文件本身不具备这样直接拷贝的可移植性
+- Linux 的 locale 配置与本地不同
+- 某些在一个环境生成的配置值，在另一个环境下无效
 
-### Actual import path
+### 实际导入路径
 
-1. keep `/opt/clawhub/data/storage`
-2. throw away remote Linux `data/pg` when it was based on the copied macOS cluster
-3. start Linux backend with fresh `data/pg`
-4. import business snapshot via:
+1. 保留 `/opt/clawhub/data/storage`
+2. 如果远端 Linux 的 `data/pg` 是从 macOS 直接拷过来的，就丢弃它
+3. 让 Linux 后端重新初始化全新的 `data/pg`
+4. 再通过下面的脚本导入业务快照：
    - [server/local/scripts/import-local-snapshot.ts](/Users/yanfei/Downloads/clawhub/server/local/scripts/import-local-snapshot.ts)
 
-## Problems encountered during deployment
+## 部署过程中遇到的问题
 
-This section is the main reason this file exists.
+这一节是这份文档存在的主要原因。
 
-### 1. `3000` was already occupied
+### 1. `3000` 已被占用
 
-Observed:
+现象：
 
-- `chatbot-app` was already bound to `3000`
+- `chatbot-app` 已经绑定了 `3000`
 
-Impact:
+影响：
 
-- UI could not use `3000`
+- UI 不能使用 `3000`
 
-Decision:
+决策：
 
-- move UI to `3003`
+- 将 UI 改到 `3003`
 
-### 2. `3002` was also already occupied
+### 2. `3002` 也已被占用
 
-Observed:
+现象：
 
-- `smart-bi-app` was bound to `3002`
+- `smart-bi-app` 绑定了 `3002`
 
-Impact:
+影响：
 
-- initial fallback plan for UI on `3002` also failed
+- UI 初始备用端口 `3002` 也不可用
 
-Decision:
+决策：
 
-- final UI port became `3003`
+- 最终 UI 端口定为 `3003`
 
-### 3. Host Node.js was too old
+### 3. 宿主机 Node.js 版本过旧
 
-Observed:
+现象：
 
-- host runtime was not appropriate for current repo dependencies/tooling
+- 宿主机运行时不适合当前仓库依赖和工具链
 
-Impact:
+影响：
 
-- backend/UI could not be safely started with host Node
+- 后端和 UI 都不能安全地直接用宿主机 Node 启动
 
-Decision:
+决策：
 
-- standardize on Docker `node:22-bookworm`
+- 统一改为 Docker `node:22-bookworm`
 
-### 4. Docker image pull/install initially depended on local proxy
+### 4. Docker 拉镜像和装依赖一开始依赖本地代理
 
-Observed:
+现象：
 
-- remote Docker daemon needed network access through the local machine proxy
-- local machine `192.168.20.4:7897` had to allow LAN access
+- 远端 Docker daemon 需要通过本机代理访问网络
+- 需要将本机 `192.168.20.4:7897` 打开局域网访问
 
-Impact:
+影响：
 
-- image pulls and dependency installation would fail until proxy access was opened
+- 在放通代理前，拉镜像和安装依赖都会失败
 
-### 5. Backend cannot run embedded Postgres as root
+### 5. 后端不能以 root 身份运行 embedded Postgres
 
-Observed:
+现象：
 
-- embedded Postgres refused to start under root
+- embedded Postgres 拒绝在 root 下启动
 
-Impact:
+影响：
 
-- naive root-based service launch failed
+- 直接用 root 跑服务会失败
 
-Decision:
+决策：
 
-- run Docker containers with `--user node`
-- repair ownership under `/opt/clawhub` to `1000:1000`
+- Docker 容器统一使用 `--user node`
+- 修复 `/opt/clawhub` 下文件 owner 为 `1000:1000`
 
-### 6. `embedded-postgres` Linux init path was unreliable
+### 6. `embedded-postgres` 在 Linux 上的初始化路径不稳定
 
-Observed:
+现象：
 
-- package-level `initialise()` failed on Linux even though the bundled `initdb` binary itself worked
+- 包自带的 `initialise()` 在 Linux 上失败
+- 但它内部附带的 `initdb` 二进制本身是可用的
 
-Impact:
+影响：
 
-- backend startup failed at database bootstrap
+- 后端在数据库初始化阶段启动失败
 
-Fix applied in code:
+代码修复：
 
-- added Linux fallback in [server/local/db/index.ts](/Users/yanfei/Downloads/clawhub/server/local/db/index.ts)
-- if package init fails, call bundled `initdb` directly
+- 在 [server/local/db/index.ts](/Users/yanfei/Downloads/clawhub/server/local/db/index.ts) 中增加 Linux fallback
+- 如果包级 init 失败，则直接调用 bundled `initdb`
 
-### 7. Schema bootstrap order bug
+### 7. Schema bootstrap 顺序有 bug
 
-Observed:
+现象：
 
-- fresh database bootstrap tried to create `stars` before `skills`
+- 全新数据库初始化时，建表顺序里先创建了 `stars`，后创建 `skills`
 
-Impact:
+影响：
 
-- backend failed on first Linux initialization
+- Linux 首次初始化时后端启动失败
 
-Fix applied in code:
+代码修复：
 
-- reordered table creation in [server/local/db/index.ts](/Users/yanfei/Downloads/clawhub/server/local/db/index.ts)
+- 在 [server/local/db/index.ts](/Users/yanfei/Downloads/clawhub/server/local/db/index.ts) 中调整建表顺序
 
-### 8. `vite.config.ts` still depended on removed `convex` package
+### 8. `vite.config.ts` 仍然依赖已移除的 `convex` 包
 
-Observed:
+现象：
 
-- UI startup failed with `Cannot find module 'convex'`
+- UI 启动时报错 `Cannot find module 'convex'`
 
-Impact:
+影响：
 
-- `clawhub-local-ui.service` crash-looped
+- `clawhub-local-ui.service` 反复 crash-loop
 
-Fix applied in code:
+代码修复：
 
-- removed startup-time `convex` package resolution from [vite.config.ts](/Users/yanfei/Downloads/clawhub/vite.config.ts)
+- 在 [vite.config.ts](/Users/yanfei/Downloads/clawhub/vite.config.ts) 中去掉启动时对 `convex` 包的解析依赖
 
-### 9. CORS for deployed UI origin was missing
+### 9. 已部署 UI 的 CORS 白名单缺失
 
-Observed:
+现象：
 
-- SSO login could complete, but frontend stayed logged out
+- SSO 登录虽然完成，但前端仍然显示未登录
 
-Impact:
+影响：
 
-- `/auth/me` from `http://192.168.63.50:3003` did not get valid CORS credential headers
+- 从 `http://192.168.63.50:3003` 请求 `/auth/me` 时没有拿到有效的跨域凭据头
 
-Fix applied:
+修复：
 
-- moved CORS whitelist into `.env`
-- introduced `CORS_ALLOWED_ORIGINS`
+- 将 CORS 白名单迁移到 `.env`
+- 引入 `CORS_ALLOWED_ORIGINS`
 
-### 10. Redirect allowlist was too implicit
+### 10. Redirect allowlist 过于隐式
 
-Observed:
+现象：
 
-- old local dev redirect targets such as `localhost:3000` could still leak into login flow
+- 旧的本地开发地址 `localhost:3000` 仍可能泄露到登录流程
 
-Impact:
+影响：
 
-- login callback could return to wrong address
+- 登录回调可能跳回错误地址
 
-Fix applied:
+修复：
 
-- introduced `REDIRECT_ALLOWED_ORIGINS`
+- 引入 `REDIRECT_ALLOWED_ORIGINS`
 
-### 11. Remote `.env` was overwritten by repo sync
+### 11. 远端 `.env` 被代码同步覆盖
 
-Observed:
+现象：
 
-- after a later full repo sync, remote config regressed to:
+- 后续一次全量仓库同步后，远端配置被回退成：
   - `APP_URL=http://localhost:3000`
   - `VITE_APP_URL=http://localhost:3000`
   - `VITE_LOCAL_BACKEND_URL=http://192.168.20.4:3001`
 
-Impact:
+影响：
 
-- UI at `192.168.63.50:3003` began redirecting SSO callback traffic back to local dev backend `192.168.20.4:3001`
+- `192.168.63.50:3003` 上的 UI 开始把 SSO 回调流量重定向回本地开发后端 `192.168.20.4:3001`
 
-Resolution:
+处理方式：
 
-- reset `/opt/clawhub/.env` to server values
-- restart both services
+- 重新把 `/opt/clawhub/.env` 改回服务器值
+- 重启前后端两个服务
 
-Operational lesson:
+运维结论：
 
-- after any full repo re-sync, always re-check `/opt/clawhub/.env`
+- 每次做全量代码同步后，都必须重新检查 `/opt/clawhub/.env`
 
-### 12. `data/pg` ownership and mode regressed after sync/restart
+### 12. `data/pg` 的 owner 和权限在同步/重启后被破坏
 
-Observed:
+现象：
 
-- backend failed with:
+- 后端报错：
   - `EACCES: permission denied, lstat 'data/pg'`
 
-Impact:
+影响：
 
-- backend could not even stat the database directory
+- 后端甚至无法 `stat` 数据库目录
 
-Fix:
+修复命令：
 
 ```bash
 chown -R 1000:1000 /opt/clawhub /opt/clawhub/data
@@ -364,46 +365,46 @@ find /opt/clawhub/data -type f -exec chmod 644 {} \;
 chmod 700 /opt/clawhub/data/pg
 ```
 
-### 13. `lc_messages = 'en_US.UTF-8'` broke Linux startup
+### 13. `lc_messages = 'en_US.UTF-8'` 导致 Linux 启动失败
 
-Observed:
+现象：
 
-- backend failed with:
+- 后端报错：
   - `invalid value for parameter "lc_messages": "en_US.UTF-8"`
   - `configuration file "/app/data/pg/postgresql.conf" contains errors`
 
-Impact:
+影响：
 
-- backend crash-looped even after permission fixes
+- 即使修好权限，后端仍然 crash-loop
 
-Fix used on the server:
+服务器上实际使用的修复命令：
 
 ```bash
 sed -i "s/^lc_messages *= *'en_US.UTF-8'/lc_messages = 'C'/" /opt/clawhub/data/pg/postgresql.conf
 systemctl restart clawhub-local-backend.service
 ```
 
-Fix applied in code:
+代码修复：
 
-- backend startup now tries to normalize this automatically on Linux in [server/local/db/index.ts](/Users/yanfei/Downloads/clawhub/server/local/db/index.ts)
+- 后端启动时现在会在 Linux 下尝试自动规范化这个配置，见 [server/local/db/index.ts](/Users/yanfei/Downloads/clawhub/server/local/db/index.ts)
 
-## Recovery checklist after any full re-sync
+## 每次全量重新同步后的恢复检查清单
 
-If the server starts behaving strangely after syncing the repo again, do these checks in order.
+如果服务器在重新同步仓库后出现异常，按下面顺序检查。
 
-### 1. Verify `.env`
+### 1. 检查 `.env`
 
 ```bash
 grep -E '^(APP_URL|VITE_APP_URL|VITE_LOCAL_BACKEND_URL|CORS_ALLOWED_ORIGINS|REDIRECT_ALLOWED_ORIGINS)=' /opt/clawhub/.env
 ```
 
-Expected:
+期望值：
 
 - `APP_URL=http://192.168.63.50:3003`
 - `VITE_APP_URL=http://192.168.63.50:3003`
 - `VITE_LOCAL_BACKEND_URL=http://192.168.63.50:3001`
 
-### 2. Repair permissions
+### 2. 修复权限
 
 ```bash
 chown -R 1000:1000 /opt/clawhub /opt/clawhub/data
@@ -412,27 +413,27 @@ find /opt/clawhub/data -type f -exec chmod 644 {} \;
 chmod 700 /opt/clawhub/data/pg
 ```
 
-### 3. Repair PostgreSQL config if needed
+### 3. 如有需要，修复 PostgreSQL 配置
 
 ```bash
 sed -i "s/^lc_messages *= *'en_US.UTF-8'/lc_messages = 'C'/" /opt/clawhub/data/pg/postgresql.conf
 ```
 
-### 4. Restart services
+### 4. 重启服务
 
 ```bash
 systemctl restart clawhub-local-backend.service
 systemctl restart clawhub-local-ui.service
 ```
 
-### 5. Verify endpoints
+### 5. 检查接口
 
 ```bash
 curl http://127.0.0.1:3001/api/v1/skills
 curl -I http://127.0.0.1:3003/
 ```
 
-## Commands used most often on this server
+## 这台服务器上最常用的命令
 
 ```bash
 systemctl status clawhub-local-backend.service --no-pager
@@ -445,12 +446,12 @@ curl http://127.0.0.1:3001/api/v1/skills
 curl -I http://127.0.0.1:3003/
 ```
 
-## Current success criteria
+## 当前成功判定标准
 
-The deployment is healthy when all of these are true:
+满足以下全部条件时，说明部署是健康的：
 
-- `clawhub-local-backend.service` is `active (running)`
-- `clawhub-local-ui.service` is `active (running)`
-- `http://192.168.63.50:3003` loads the UI
-- `http://192.168.63.50:3001/api/v1/skills` returns JSON
-- SSO callback resolves through `192.168.63.50:3001`, not `192.168.20.4:3001`
+- `clawhub-local-backend.service` 为 `active (running)`
+- `clawhub-local-ui.service` 为 `active (running)`
+- `http://192.168.63.50:3003` 能正常打开 UI
+- `http://192.168.63.50:3001/api/v1/skills` 能返回 JSON
+- SSO 回调通过的是 `192.168.63.50:3001`，而不是 `192.168.20.4:3001`
