@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useI18n } from "../lib/i18n";
 
 type PackageManager = "npm" | "pnpm" | "bun";
 
@@ -14,6 +15,7 @@ const PACKAGE_MANAGERS: Array<{ id: PackageManager; label: string }> = [
 
 export function InstallSwitcher({ exampleSlug = "sonoscli" }: InstallSwitcherProps) {
   const [pm, setPm] = useState<PackageManager>("npm");
+  const { t } = useI18n();
 
   const command = useMemo(() => {
     switch (pm) {
@@ -29,8 +31,12 @@ export function InstallSwitcher({ exampleSlug = "sonoscli" }: InstallSwitcherPro
   return (
     <div className="install-switcher">
       <div className="install-switcher-row">
-        <div className="stat">Install any skill folder in one shot:</div>
-        <div className="install-switcher-toggle" role="tablist" aria-label="Install command">
+        <div className="stat">{t("home.install.oneShot")}</div>
+        <div
+          className="install-switcher-toggle"
+          role="tablist"
+          aria-label={t("home.install.command")}
+        >
           {PACKAGE_MANAGERS.map((entry) => (
             <button
               key={entry.id}

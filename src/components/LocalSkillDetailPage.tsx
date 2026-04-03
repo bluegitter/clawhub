@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { useI18n } from "../lib/i18n";
 import {
   getLocalStarStatus,
   renameLocalSkill,
@@ -19,11 +20,8 @@ type LocalSkillDetailPageProps = {
   data: LocalSkillDetailData | null;
 };
 
-export function LocalSkillDetailPage({
-  slug,
-  canonicalOwner,
-  data,
-}: LocalSkillDetailPageProps) {
+export function LocalSkillDetailPage({ slug, canonicalOwner, data }: LocalSkillDetailPageProps) {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const { isAuthenticated, me } = useAuthStatus();
   const [isStarred, setIsStarred] = useState(false);
@@ -43,9 +41,9 @@ export function LocalSkillDetailPage({
   const [starCount, setStarCount] = useState(data?.skill?.stats.stars ?? 0);
   const isOwner = Boolean(
     isAuthenticated &&
-      me?.handle &&
-      ownerProfile?.handle &&
-      me.handle.trim().toLowerCase() === ownerProfile.handle.trim().toLowerCase(),
+    me?.handle &&
+    ownerProfile?.handle &&
+    me.handle.trim().toLowerCase() === ownerProfile.handle.trim().toLowerCase(),
   );
 
   useEffect(() => {
@@ -81,11 +79,11 @@ export function LocalSkillDetailPage({
       <main className="section">
         <div className="card">
           <h1 className="section-title" style={{ marginTop: 0 }}>
-            Skill not found
+            {t("localSkill.notFound")}
           </h1>
-          <p className="section-subtitle">The requested skill is not available in the local registry.</p>
+          <p className="section-subtitle">{t("localSkill.notFoundSubtitle")}</p>
           <Link to="/skills" className="btn" style={{ marginTop: 16 }}>
-            Back to skills
+            {t("localSkill.backToSkills")}
           </Link>
         </div>
       </main>
@@ -108,7 +106,8 @@ export function LocalSkillDetailPage({
     if (!data?.skill || !isOwner || isRenaming) return;
     const nextSlug = renameSlug.trim().toLowerCase();
     if (!nextSlug || nextSlug === data.skill.slug) return;
-    if (!window.confirm(`Rename ${data.skill.slug} to ${nextSlug}? Old slug will redirect.`)) return;
+    if (!window.confirm(t("localSkill.renameConfirm", { from: data.skill.slug, to: nextSlug })))
+      return;
     setIsRenaming(true);
     try {
       const result = await renameLocalSkill(data.skill.slug, nextSlug);
@@ -138,22 +137,24 @@ export function LocalSkillDetailPage({
                   {data.skill.displayName}
                 </h1>
               </div>
-              <p className="section-subtitle">{data.skill.summary ?? "No summary provided."}</p>
+              <p className="section-subtitle">{data.skill.summary ?? t("skill.noSummary")}</p>
               <div className="stat">
                 <UserBadge
                   user={ownerProfile}
                   fallbackHandle={ownerLabel}
-                  prefix="by"
+                  prefix={t("common.by")}
                   link={false}
                   showName
                 />
               </div>
-              <div className="stat">★ {starCount} · ↓ {data.skill.stats.downloads}</div>
+              <div className="stat">
+                ★ {starCount} · ↓ {data.skill.stats.downloads}
+              </div>
             </div>
             <div className="skill-hero-actions">
               {downloadHref ? (
                 <a className="btn btn-primary" href={downloadHref}>
-                  Download latest
+                  {t("localSkill.downloadLatest")}
                 </a>
               ) : null}
               {isAuthenticated ? (
@@ -174,35 +175,34 @@ export function LocalSkillDetailPage({
       {isOwner ? (
         <div className="card skill-owner-tools" style={{ marginTop: 16 }}>
           <h2 className="section-title" style={{ marginTop: 0 }}>
-            Owner tools
+            {t("localSkill.ownerTools")}
           </h2>
-          <p className="section-subtitle">
-            Rename the canonical slug. Old slug links will keep redirecting to the new page.
-          </p>
+          <p className="section-subtitle">{t("localSkill.ownerToolsSubtitle")}</p>
           <div className="skill-owner-tools-grid">
             <label className="management-control management-control-stack">
-              <span className="mono">rename slug</span>
+              <span className="mono">{t("localSkill.renameSlug")}</span>
               <input
                 className="management-field"
                 value={renameSlug}
                 onChange={(event) => setRenameSlug(event.target.value)}
-                placeholder="new-slug"
+                placeholder={t("localSkill.renamePlaceholder")}
                 autoComplete="off"
                 spellCheck={false}
               />
               <span className="section-subtitle">
-                Current page: {buildSkillHref(ownerProfile?.handle ?? ownerLabel ?? null, null, data.skill.slug)}
+                {t("localSkill.currentPage")}:{" "}
+                {buildSkillHref(ownerProfile?.handle ?? ownerLabel ?? null, null, data.skill.slug)}
               </span>
             </label>
             <div className="management-control management-control-stack">
-              <span className="mono">rename action</span>
+              <span className="mono">{t("localSkill.renameAction")}</span>
               <button
                 className="btn management-action-btn"
                 type="button"
                 onClick={() => void handleRename()}
                 disabled={isRenaming || renameSlug.trim().toLowerCase() === data.skill.slug}
               >
-                {isRenaming ? "Renaming…" : "Rename and redirect"}
+                {isRenaming ? t("localSkill.renaming") : t("localSkill.renameAndRedirect")}
               </button>
             </div>
           </div>

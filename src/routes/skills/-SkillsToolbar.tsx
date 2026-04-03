@@ -1,4 +1,5 @@
 import type { RefObject } from "react";
+import { useI18n } from "../../lib/i18n";
 import { type SortDir, type SortKey } from "./-params";
 
 type SkillsToolbarProps = {
@@ -34,6 +35,7 @@ export function SkillsToolbar({
   onToggleDir,
   onToggleView,
 }: SkillsToolbarProps) {
+  const { t } = useI18n();
   return (
     <div className="skills-toolbar">
       <div className="skills-search">
@@ -42,7 +44,7 @@ export function SkillsToolbar({
           className="skills-search-input"
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
-          placeholder="Filter by name, slug, or summary…"
+          placeholder={t("skills.searchPlaceholder")}
         />
       </div>
       <div className="skills-toolbar-row">
@@ -52,7 +54,7 @@ export function SkillsToolbar({
           aria-pressed={highlightedOnly}
           onClick={onToggleHighlighted}
         >
-          Highlighted
+          {t("skills.highlighted")}
         </button>
         <button
           className={`search-filter-button${nonSuspiciousOnly ? " is-active" : ""}`}
@@ -60,26 +62,26 @@ export function SkillsToolbar({
           aria-pressed={nonSuspiciousOnly}
           onClick={onToggleNonSuspicious}
         >
-          Hide suspicious
+          {t("skills.hideSuspicious")}
         </button>
         <select
           className="skills-sort"
           value={sort}
           onChange={(event) => onSortChange(event.target.value)}
-          aria-label="Sort skills"
+          aria-label={t("skills.sortLabel")}
         >
-          {hasQuery ? <option value="relevance">Relevance</option> : null}
-          <option value="newest">Newest</option>
-          <option value="updated">Recently updated</option>
-          <option value="downloads">Downloads</option>
-          <option value="installs">Installs</option>
-          <option value="stars">Stars</option>
-          <option value="name">Name</option>
+          {hasQuery ? <option value="relevance">{t("skills.relevance")}</option> : null}
+          <option value="newest">{t("skills.newest")}</option>
+          <option value="updated">{t("skills.updated")}</option>
+          <option value="downloads">{t("skills.downloads")}</option>
+          <option value="installs">{t("skills.installs")}</option>
+          <option value="stars">{t("skills.stars")}</option>
+          <option value="name">{t("skills.name")}</option>
         </select>
         <button
           className="skills-dir"
           type="button"
-          aria-label={`Sort direction ${dir}`}
+          aria-label={t("skills.sortDir", { dir })}
           onClick={onToggleDir}
         >
           {dir === "asc" ? "↑" : "↓"}
@@ -89,7 +91,7 @@ export function SkillsToolbar({
           type="button"
           onClick={onToggleView}
         >
-          {view === "cards" ? "List" : "Cards"}
+          {view === "cards" ? t("skills.viewList") : t("skills.viewCards")}
         </button>
       </div>
     </div>

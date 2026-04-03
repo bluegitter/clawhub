@@ -1,5 +1,6 @@
 export type SiteMode = "skills" | "souls";
 
+import type { Locale } from "./i18n";
 import { getRuntimeEnv } from "./runtimeEnv";
 
 const DEFAULT_CLAWHUB_SITE_URL = "https://clawhub.ai";
@@ -89,10 +90,14 @@ export function getSiteName(mode: SiteMode = getSiteMode()) {
   return mode === "souls" ? "SoulHub" : "ClawHub";
 }
 
-export function getSiteDescription(mode: SiteMode = getSiteMode()) {
+export function getSiteDescription(mode: SiteMode = getSiteMode(), locale: Locale = "en") {
   return mode === "souls"
-    ? "SoulHub — the home for SOUL.md bundles and personal system lore."
-    : "ClawHub — a fast skill registry for agents, with vector search.";
+    ? locale === "zh"
+      ? "SoulHub：集中托管 SOUL.md 包和个人系统知识的地方。"
+      : "SoulHub — the home for SOUL.md bundles and personal system lore."
+    : locale === "zh"
+      ? "ClawHub：面向智能体的快速技能注册表，支持向量搜索。"
+      : "ClawHub — a fast skill registry for agents, with vector search.";
 }
 
 export function getSiteUrlForMode(mode: SiteMode = getSiteMode()) {

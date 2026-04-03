@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { SecurityScanResults } from "../../components/SkillSecurityScanResults";
+import { getPreferredLocale, useI18n } from "../../lib/i18n";
 import { shouldUseLocalBackend } from "../../lib/localBackend";
 import {
   fetchPackageDetail,
@@ -40,12 +41,14 @@ export const Route = createFileRoute("/plugins/$name")({
     meta: [
       {
         title: loaderData?.detail.package?.displayName
-          ? `${loaderData.detail.package.displayName} · Plugins`
+          ? `${loaderData.detail.package.displayName} · ${getPreferredLocale() === "zh" ? "插件" : "Plugins"}`
           : params.name,
       },
       {
         name: "description",
-        content: loaderData?.detail.package?.summary ?? `Plugin ${params.name}`,
+        content:
+          loaderData?.detail.package?.summary ??
+          `${getPreferredLocale() === "zh" ? "插件" : "Plugin"} ${params.name}`,
       },
     ],
   }),
@@ -53,6 +56,7 @@ export const Route = createFileRoute("/plugins/$name")({
 });
 
 function VerifiedBadge() {
+  const { t } = useI18n();
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#3b82f6" }}>
       <svg
@@ -61,7 +65,7 @@ function VerifiedBadge() {
         viewBox="0 0 16 16"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        aria-label="Verified publisher"
+        aria-label={t("plugin.verifiedPublisher")}
         style={{ flexShrink: 0 }}
       >
         <path
@@ -76,12 +80,13 @@ function VerifiedBadge() {
           strokeLinejoin="round"
         />
       </svg>
-      Verified
+      {t("plugins.verified")}
     </span>
   );
 }
 
 function PluginDetailRoute() {
+  const { t } = useI18n();
   const { name } = Route.useParams();
   const { detail, version, readme } = Route.useLoaderData() as PluginDetailLoaderData;
   const useLocalBackend = shouldUseLocalBackend();
@@ -90,9 +95,7 @@ function PluginDetailRoute() {
     return (
       <main className="section">
         <div className="card">
-          {useLocalBackend
-            ? "Plugin detail pages have not been migrated to the local backend yet."
-            : "Plugin not found."}
+          {useLocalBackend ? t("plugin.notFoundLocal") : t("plugin.notFound")}
         </div>
       </main>
     );
@@ -119,7 +122,10 @@ function PluginDetailRoute() {
               </span>
             ) : null}
             {pkg.isOfficial ? (
-              <span className="tag" style={{ background: "rgba(59, 130, 246, 0.15)", color: "#3b82f6" }}>
+              <span
+                className="tag"
+                style={{ background: "rgba(59, 130, 246, 0.15)", color: "#3b82f6" }}
+              >
                 <VerifiedBadge />
               </span>
             ) : null}
@@ -129,47 +135,57 @@ function PluginDetailRoute() {
             {pkg.displayName}
           </h1>
           <p className="section-subtitle" style={{ marginBottom: 12 }}>
-            {pkg.summary ?? "No summary provided."}
+            {pkg.summary ?? t("skill.noSummary")}
           </p>
           {pkg.family === "code-plugin" && !pkg.isOfficial ? (
             <div className="tag tag-accent" style={{ marginBottom: 12 }}>
-              Community code plugin. Review compatibility and verification before install.
+              {t("plugin.communityWarning")}
             </div>
           ) : null}
           <div className="skills-row-slug" style={{ marginBottom: 12 }}>
             {pkg.name}
-            {pkg.runtimeId ? ` · runtime id ${pkg.runtimeId}` : ""}
+            {pkg.runtimeId ? ` · ${t("plugin.runtimeId", { id: pkg.runtimeId })}` : ""}
           </div>
           <details className="bundle-details" open>
-            <summary>Install</summary>
+            <summary>{t("plugin.install")}</summary>
             <pre>
               <code>{installSnippet}</code>
             </pre>
           </details>
           <details className="bundle-details" open>
-            <summary>Latest Release</summary>
+            <summary>{t("plugin.latestRelease")}</summary>
             <div style={{ display: "grid", gap: 8 }}>
-              <div>{pkg.latestVersion ? `Version ${pkg.latestVersion}` : "No latest tag"}</div>
+              <div>
+                {pkg.latestVersion
+                  ? t("plugin.version", { version: pkg.latestVersion })
+                  : t("plugin.noLatestTag")}
+              </div>
               {pkg.latestVersion ? (
                 <div>
-                  <a href={getPackageDownloadPath(name, pkg.latestVersion)}>Download zip</a>
+                  <a href={getPackageDownloadPath(name, pkg.latestVersion)}>
+                    {t("skill.downloadZip")}
+                  </a>
                 </div>
               ) : null}
             </div>
           </details>
           {latestRelease ? (
             <details className="bundle-details" open>
-              <summary>Compatibility</summary>
+              <summary>{t("plugin.compatibility")}</summary>
               <pre>
-                <code>{JSON.stringify(latestRelease.compatibility ?? pkg.compatibility ?? {}, null, 2)}</code>
+                <code>
+                  {JSON.stringify(latestRelease.compatibility ?? pkg.compatibility ?? {}, null, 2)}
+                </code>
               </pre>
             </details>
           ) : null}
           {latestRelease ? (
             <details className="bundle-details" open>
-              <summary>Capabilities</summary>
+              <summary>{t("plugin.capabilities")}</summary>
               <pre>
-                <code>{JSON.stringify(latestRelease.capabilities ?? pkg.capabilities ?? {}, null, 2)}</code>
+                <code>
+                  {JSON.stringify(latestRelease.capabilities ?? pkg.capabilities ?? {}, null, 2)}
+                </code>
               </pre>
             </details>
           ) : null}
@@ -182,13 +198,15 @@ function PluginDetailRoute() {
             />
           ) : null}
           <details className="bundle-details" open>
-            <summary>Verification</summary>
+            <summary>{t("plugin.verification")}</summary>
             <pre>
-              <code>{JSON.stringify(latestRelease?.verification ?? pkg.verification ?? {}, null, 2)}</code>
+              <code>
+                {JSON.stringify(latestRelease?.verification ?? pkg.verification ?? {}, null, 2)}
+              </code>
             </pre>
           </details>
           <details className="bundle-details" open>
-            <summary>Tags</summary>
+            <summary>{t("plugin.tags")}</summary>
             <pre>
               <code>{JSON.stringify(pkg.tags, null, 2)}</code>
             </pre>

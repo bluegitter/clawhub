@@ -1,4 +1,5 @@
 import type { Doc } from "../../convex/_generated/dataModel";
+import { useI18n } from "../lib/i18n";
 import { getRuntimeEnv } from "../lib/runtimeEnv";
 import { type LlmAnalysis, SecurityScanResults } from "./SkillSecurityScanResults";
 
@@ -17,17 +18,16 @@ export function SkillVersionsPanel({
   suppressScanResults,
   suppressedMessage,
 }: SkillVersionsPanelProps) {
+  const { t, formatDate } = useI18n();
   const convexSiteUrl = getRuntimeEnv("VITE_CONVEX_SITE_URL") ?? "https://clawhub.ai";
   return (
     <div className="tab-body">
       <div>
         <h2 className="section-title" style={{ fontSize: "1.2rem", margin: 0 }}>
-          Versions
+          {t("detail.versions")}
         </h2>
         <p className="section-subtitle" style={{ margin: 0 }}>
-          {nixPlugin
-            ? "Review release history and changelog."
-            : "Download older releases or scan the changelog."}
+          {nixPlugin ? t("detail.reviewReleases") : t("detail.downloadOlderOrScan")}
         </p>
         {suppressedMessage ? <p className="section-subtitle">{suppressedMessage}</p> : null}
       </div>
@@ -37,9 +37,9 @@ export function SkillVersionsPanel({
             <div key={version._id} className="version-row">
               <div className="version-info">
                 <div>
-                  v{version.version} · {new Date(version.createdAt).toLocaleDateString()}
+                  v{version.version} · {formatDate(version.createdAt)}
                   {version.changelogSource === "auto" ? (
-                    <span style={{ color: "var(--ink-soft)" }}> · auto</span>
+                    <span style={{ color: "var(--ink-soft)" }}> · {t("detail.auto")}</span>
                   ) : null}
                 </div>
                 <div style={{ color: "#5c554e", whiteSpace: "pre-wrap" }}>{version.changelog}</div>
@@ -60,7 +60,7 @@ export function SkillVersionsPanel({
                     className="btn version-zip"
                     href={`${convexSiteUrl}/api/v1/download?slug=${skillSlug}&version=${version.version}`}
                   >
-                    Zip
+                    {t("detail.zip")}
                   </a>
                 </div>
               ) : null}

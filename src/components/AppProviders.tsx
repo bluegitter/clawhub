@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { LocaleProvider } from "../lib/i18n";
 import { clearLocalSessionToken, setLocalSessionToken } from "../lib/localBackend";
 import { getLocalBackendOrigin } from "../lib/runtimeEnv";
 import { setAuthError } from "../lib/useAuthError";
@@ -97,11 +98,11 @@ export function LocalSessionHandler() {
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
-    <>
+    <LocaleProvider>
       <LocalSsoTokenHandler />
       <LocalSessionHandler />
       <AuthErrorHandler />
       {children}
-    </>
+    </LocaleProvider>
   );
 }

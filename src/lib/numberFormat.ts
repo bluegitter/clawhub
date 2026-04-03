@@ -10,6 +10,8 @@ export type SoulStatsTriplet = {
   versions: number;
 };
 
+type NumberFormatter = (value: number) => string;
+
 const THOUSAND = 1_000;
 const MILLION = 1_000_000;
 
@@ -33,18 +35,24 @@ export function formatCompactStat(value: number): string {
   return `${sign}${formatUnit(absolute / MILLION).formatted}M`;
 }
 
-export function formatSkillStatsTriplet(stats: SkillStatsTriplet) {
+export function formatSkillStatsTriplet(
+  stats: SkillStatsTriplet,
+  formatNumber: NumberFormatter = formatCompactStat,
+) {
   return {
-    stars: formatCompactStat(stats.stars),
-    downloads: formatCompactStat(stats.downloads),
-    installsAllTime: formatCompactStat(stats.installsAllTime ?? 0),
+    stars: formatNumber(stats.stars),
+    downloads: formatNumber(stats.downloads),
+    installsAllTime: formatNumber(stats.installsAllTime ?? 0),
   };
 }
 
-export function formatSoulStatsTriplet(stats: SoulStatsTriplet) {
+export function formatSoulStatsTriplet(
+  stats: SoulStatsTriplet,
+  formatNumber: NumberFormatter = formatCompactStat,
+) {
   return {
-    stars: formatCompactStat(stats.stars),
-    downloads: formatCompactStat(stats.downloads),
+    stars: formatNumber(stats.stars),
+    downloads: formatNumber(stats.downloads),
     versions: stats.versions,
   };
 }

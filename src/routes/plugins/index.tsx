@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { fetchPluginCatalog, type PackageListItem } from "../../lib/packageApi";
+import { useI18n } from "../../lib/i18n";
 import { shouldUseLocalBackend } from "../../lib/localBackend";
+import { fetchPluginCatalog, type PackageListItem } from "../../lib/packageApi";
 import { familyLabel } from "../../lib/packageLabels";
 
 type PluginSearchState = {
@@ -31,9 +32,7 @@ export const Route = createFileRoute("/plugins/")({
         ? true
         : undefined,
     executesCode:
-      search.executesCode === true ||
-      search.executesCode === "true" ||
-      search.executesCode === "1"
+      search.executesCode === true || search.executesCode === "true" || search.executesCode === "1"
         ? true
         : undefined,
   }),
@@ -62,6 +61,7 @@ export const Route = createFileRoute("/plugins/")({
 });
 
 function VerifiedBadge() {
+  const { t } = useI18n();
   return (
     <svg
       width="16"
@@ -69,7 +69,7 @@ function VerifiedBadge() {
       viewBox="0 0 16 16"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      aria-label="Verified publisher"
+      aria-label={t("plugin.verifiedPublisher")}
       style={{ display: "inline-block", verticalAlign: "middle", flexShrink: 0 }}
     >
       <path
@@ -88,6 +88,7 @@ function VerifiedBadge() {
 }
 
 export function PluginsIndex() {
+  const { t } = useI18n();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const { items, nextCursor } = Route.useLoaderData() as PluginsLoaderData;
@@ -102,20 +103,17 @@ export function PluginsIndex() {
     <main className="section">
       <header className="skills-header-top">
         <h1 className="section-title" style={{ marginBottom: 8 }}>
-          Plugins
+          {t("plugins.title")}
         </h1>
         <p className="section-subtitle" style={{ marginBottom: 0 }}>
-          {useLocalBackend
-            ? "Plugin catalog pages have not been migrated to the local backend yet."
-            : "Browse the plugin catalog."}
+          {useLocalBackend ? t("plugins.localSubtitle") : t("plugins.subtitle")}
         </p>
       </header>
 
       {useLocalBackend ? (
         <div className="card">
           <p className="section-subtitle" style={{ marginTop: 0 }}>
-            Local deployment currently supports skills. Plugin catalog browse and plugin detail APIs
-            still need dedicated local backend support.
+            {t("plugins.localBody")}
           </p>
           <Link
             className="btn btn-primary"
@@ -129,7 +127,7 @@ export function PluginsIndex() {
               sourceRepo: undefined,
             }}
           >
-            Publish Plugin
+            {t("dashboard.publishPlugin")}
           </Link>
         </div>
       ) : (
@@ -150,7 +148,7 @@ export function PluginsIndex() {
             <div className="skills-search">
               <input
                 className="skills-search-input"
-                placeholder="Search plugins…"
+                placeholder={t("plugins.searchPlaceholder")}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
@@ -170,11 +168,11 @@ export function PluginsIndex() {
                     }),
                   });
                 }}
-                aria-label="Filter by type"
+                aria-label={t("plugins.filterType")}
               >
-                <option value="">All plugins</option>
-                <option value="code-plugin">Code plugins</option>
-                <option value="bundle-plugin">Bundle plugins</option>
+                <option value="">{t("plugins.all")}</option>
+                <option value="code-plugin">{t("plugins.code")}</option>
+                <option value="bundle-plugin">{t("plugins.bundle")}</option>
               </select>
               <button
                 className="search-filter-button"
@@ -191,7 +189,7 @@ export function PluginsIndex() {
                   });
                 }}
               >
-                Verified
+                {t("plugins.verified")}
               </button>
               <button
                 className="search-filter-button"
@@ -208,7 +206,7 @@ export function PluginsIndex() {
                   });
                 }}
               >
-                Executes code
+                {t("plugins.executesCode")}
               </button>
               <Link
                 className="btn btn-primary"
@@ -222,13 +220,13 @@ export function PluginsIndex() {
                   sourceRepo: undefined,
                 }}
               >
-                Publish Plugin
+                {t("dashboard.publishPlugin")}
               </Link>
             </div>
           </form>
 
           {items.length === 0 ? (
-            <div className="card">No plugins match that filter.</div>
+            <div className="card">{t("plugins.noMatch")}</div>
           ) : (
             <>
               <div className="grid">
@@ -243,17 +241,24 @@ export function PluginsIndex() {
                       <span className="tag tag-compact">{familyLabel(item.family)}</span>
                       {item.isOfficial ? (
                         <span className="tag tag-compact tag-accent">
-                          <VerifiedBadge /> Verified
+                          <VerifiedBadge /> {t("plugins.verified")}
                         </span>
                       ) : null}
                     </div>
                     <h3 className="skill-card-title">{item.displayName}</h3>
-                    <p className="skill-card-summary">
-                      {item.summary ?? "No summary provided."}
-                    </p>
-                    <div className="skill-card-footer" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <p className="skill-card-summary">{item.summary ?? t("skill.noSummary")}</p>
+                    <div
+                      className="skill-card-footer"
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
                       <span className="stat">
-                        {item.ownerHandle ? `by ${item.ownerHandle}` : "community"}
+                        {item.ownerHandle
+                          ? `${t("common.by")} ${item.ownerHandle}`
+                          : t("plugins.community")}
                       </span>
                       {item.latestVersion ? (
                         <span className="stat">v{item.latestVersion}</span>
@@ -263,9 +268,7 @@ export function PluginsIndex() {
                 ))}
               </div>
               {!search.q && (search.cursor || nextCursor) ? (
-                <div
-                  style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 22 }}
-                >
+                <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 22 }}>
                   {search.cursor ? (
                     <button
                       className="btn"
@@ -279,7 +282,7 @@ export function PluginsIndex() {
                         });
                       }}
                     >
-                      First page
+                      {t("plugins.firstPage")}
                     </button>
                   ) : null}
                   {nextCursor ? (
@@ -295,7 +298,7 @@ export function PluginsIndex() {
                         });
                       }}
                     >
-                      Next page
+                      {t("plugins.nextPage")}
                     </button>
                   ) : null}
                 </div>

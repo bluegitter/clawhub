@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { gravatarUrl } from "../lib/gravatar";
+import { useI18n } from "../lib/i18n";
 import {
   createLocalApiToken,
   listLocalApiTokens,
@@ -14,6 +15,7 @@ export const Route = createFileRoute("/settings")({
 });
 
 export function Settings() {
+  const { t, formatDateTime } = useI18n();
   const { me, isAuthenticated, isLoading } = useAuthStatus();
   const [tokens, setTokens] = useState<LocalApiTokenSummary[]>([]);
   const [tokenLabel, setTokenLabel] = useState("");
@@ -53,7 +55,7 @@ export function Settings() {
   if (isLoading) {
     return (
       <main className="section">
-        <div className="card">Loading settings…</div>
+        <div className="card">{t("settings.loading")}</div>
       </main>
     );
   }
@@ -61,7 +63,7 @@ export function Settings() {
   if (!isAuthenticated || !me) {
     return (
       <main className="section">
-        <div className="card">Sign in to access settings.</div>
+        <div className="card">{t("settings.signIn")}</div>
       </main>
     );
   }
@@ -94,11 +96,15 @@ export function Settings() {
 
   return (
     <main className="section settings-shell">
-      <h1 className="section-title">Settings</h1>
+      <h1 className="section-title">{t("settings.title")}</h1>
 
       <div className="card settings-profile">
         <div className="settings-avatar">
-          {avatar ? <img src={avatar} alt={identityName} /> : <span>{identityName[0]?.toUpperCase() ?? "U"}</span>}
+          {avatar ? (
+            <img src={avatar} alt={identityName} />
+          ) : (
+            <span>{identityName[0]?.toUpperCase() ?? "U"}</span>
+          )}
         </div>
         <div className="settings-profile-body">
           <div className="settings-name">{identityName}</div>
@@ -109,64 +115,82 @@ export function Settings() {
 
       <div className="card settings-card">
         <h2 className="section-title" style={{ marginTop: 0 }}>
-          Local Account
+          {t("settings.localAccount")}
         </h2>
-        <p className="section-subtitle">
-          The local deployment currently exposes your synced identity and session, but profile editing,
-          API tokens, and organization management have not been migrated yet.
-        </p>
-        <div className="stat">Display name: {me.displayName ?? "Not set"}</div>
-        <div className="stat">Real name: {me.name ?? "Not set"}</div>
-        <div className="stat">Handle: {me.handle ?? "Not set"}</div>
-        <div className="stat">Email: {me.email ?? "Not set"}</div>
+        <p className="section-subtitle">{t("settings.localAccountSubtitle")}</p>
+        <div className="stat">
+          {t("settings.displayName")}: {me.displayName ?? t("settings.notSet")}
+        </div>
+        <div className="stat">
+          {t("settings.realName")}: {me.name ?? t("settings.notSet")}
+        </div>
+        <div className="stat">
+          {t("settings.handle")}: {me.handle ?? t("settings.notSet")}
+        </div>
+        <div className="stat">
+          {t("settings.email")}: {me.email ?? t("settings.notSet")}
+        </div>
       </div>
 
       <div className="card settings-card">
         <h2 className="section-title" style={{ marginTop: 0 }}>
-          API Tokens
+          {t("settings.apiTokens")}
         </h2>
-        <p className="section-subtitle">
-          Create local API tokens for CLI and scripted access. New token values are shown only once.
-        </p>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
+        <p className="section-subtitle">{t("settings.apiTokensSubtitle")}</p>
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
+            flexWrap: "wrap",
+            alignItems: "center",
+            marginBottom: 16,
+          }}
+        >
           <input
             value={tokenLabel}
             onChange={(event) => setTokenLabel(event.target.value)}
-            placeholder="Token label"
+            placeholder={t("settings.tokenLabel")}
             className="input"
             style={{ minWidth: 240 }}
           />
           <button type="button" className="btn btn-primary" onClick={() => void onCreateToken()}>
-            Create token
+            {t("settings.createToken")}
           </button>
         </div>
         {newToken ? (
           <div className="stat" style={{ overflowWrap: "anywhere" }}>
-            New token: <code>{newToken}</code>
+            {t("settings.newToken")}: <code>{newToken}</code>
           </div>
         ) : null}
         {tokenError ? <div className="stat">{tokenError}</div> : null}
         {tokensLoading ? (
-          <div className="stat">Loading API tokens…</div>
+          <div className="stat">{t("settings.loadingTokens")}</div>
         ) : tokens.length === 0 ? (
-          <div className="stat">No API tokens created yet.</div>
+          <div className="stat">{t("settings.noTokens")}</div>
         ) : (
           <div style={{ display: "grid", gap: 12 }}>
             {tokens.map((token) => (
               <div
                 key={token.id}
                 className="stat"
-                style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center" }}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 16,
+                  alignItems: "center",
+                }}
               >
                 <div style={{ display: "grid", gap: 4 }}>
                   <strong>{token.label}</strong>
                   <span>
                     Prefix: <code>{token.prefix}</code>
                   </span>
-                  <span>Created: {new Date(token.createdAt).toLocaleString()}</span>
+                  <span>
+                    {t("settings.created")}: {formatDateTime(token.createdAt)}
+                  </span>
                 </div>
                 <button type="button" className="btn" onClick={() => void onRevokeToken(token.id)}>
-                  Revoke
+                  {t("settings.revoke")}
                 </button>
               </div>
             ))}
@@ -176,14 +200,14 @@ export function Settings() {
 
       <div className="card settings-card">
         <h2 className="section-title" style={{ marginTop: 0 }}>
-          Not Yet Migrated
+          {t("settings.notMigrated")}
         </h2>
         <p className="section-subtitle" style={{ marginBottom: 0 }}>
-          These features still need local backend support before they can be enabled:
+          {t("settings.notMigratedSubtitle")}
         </p>
-        <div className="stat">Profile editing</div>
-        <div className="stat">Organization publishers and member management</div>
-        <div className="stat">Account deletion workflow</div>
+        <div className="stat">{t("settings.profileEditing")}</div>
+        <div className="stat">{t("settings.orgManagement")}</div>
+        <div className="stat">{t("settings.accountDeletion")}</div>
       </div>
     </main>
   );

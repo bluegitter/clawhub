@@ -1,9 +1,10 @@
-import { useAction } from "../lib/convexCompat";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { api } from "../../convex/_generated/api";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
+import { useAction } from "../lib/convexCompat";
+import { useI18n } from "../lib/i18n";
 import { formatBytes } from "./skillDetailUtils";
 
 type SkillFile = Doc<"skillVersions">["files"][number];
@@ -21,6 +22,7 @@ export function SkillFilesPanel({
   readmeError,
   latestFiles,
 }: SkillFilesPanelProps) {
+  const { t } = useI18n();
   const getFileText = useAction(api.skills.getFileText);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
@@ -29,7 +31,9 @@ export function SkillFilesPanel({
   const [isLoading, setIsLoading] = useState(false);
   const isMounted = useRef(true);
   const requestId = useRef(0);
-  const fileCache = useRef(new Map<string, { text: string; size: number; sha256: string | null }>());
+  const fileCache = useRef(
+    new Map<string, { text: string; size: number; sha256: string | null }>(),
+  );
 
   useEffect(() => {
     isMounted.current = true;
@@ -100,9 +104,9 @@ export function SkillFilesPanel({
           {readmeContent ? (
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{readmeContent}</ReactMarkdown>
           ) : readmeError ? (
-            <div className="stat">Failed to load SKILL.md: {readmeError}</div>
+            <div className="stat">{t("files.readmeFailed", { error: readmeError })}</div>
           ) : (
-            <div>Loading…</div>
+            <div>{t("common.loading")}</div>
           )}
         </div>
       </div>
@@ -113,12 +117,12 @@ export function SkillFilesPanel({
               Files
             </h3>
             <span className="section-subtitle" style={{ margin: 0 }}>
-              {latestFiles.length} total
+              {t("files.total", { count: latestFiles.length })}
             </span>
           </div>
           <div className="file-list-body">
             {latestFiles.length === 0 ? (
-              <div className="stat">No files available.</div>
+              <div className="stat">{t("files.empty")}</div>
             ) : (
               latestFiles.map((file) => (
                 <button
@@ -139,7 +143,7 @@ export function SkillFilesPanel({
         </div>
         <div className="file-viewer">
           <div className="file-viewer-header">
-            <div className="file-path">{selectedPath ?? "Select a file"}</div>
+            <div className="file-path">{selectedPath ?? t("common.selectFile")}</div>
             {fileMeta ? (
               <span className="file-meta">
                 {formatBytes(fileMeta.size)} · {(fileMeta.sha256 ?? "unknown").slice(0, 12)}…
@@ -148,13 +152,13 @@ export function SkillFilesPanel({
           </div>
           <div className="file-viewer-body">
             {isLoading ? (
-              <div className="stat">Loading…</div>
+              <div className="stat">{t("common.loading")}</div>
             ) : fileError ? (
-              <div className="stat">Failed to load file: {fileError}</div>
+              <div className="stat">{t("files.failed", { error: fileError })}</div>
             ) : fileContent ? (
               <pre className="file-viewer-code">{fileContent}</pre>
             ) : (
-              <div className="stat">Select a file to preview.</div>
+              <div className="stat">{t("common.selectToPreview")}</div>
             )}
           </div>
         </div>

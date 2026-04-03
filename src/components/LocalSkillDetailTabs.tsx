@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { useI18n } from "../lib/i18n";
 import {
   deleteLocalSkillVersion,
   fetchLocalSkillFile,
@@ -21,6 +22,7 @@ type LocalSkillDetailTabsProps = {
 type TabKey = "files" | "compare" | "versions";
 
 export function LocalSkillDetailTabs({ slug, data }: LocalSkillDetailTabsProps) {
+  const { t, formatDateTime } = useI18n();
   const { isAuthenticated } = useAuthStatus();
   const [activeTab, setActiveTab] = useState<TabKey>("files");
   const [versions, setVersions] = useState(data.versions);
@@ -132,21 +134,21 @@ export function LocalSkillDetailTabs({ slug, data }: LocalSkillDetailTabsProps) 
           type="button"
           onClick={() => setActiveTab("files")}
         >
-          Files
+          {t("detail.files")}
         </button>
         <button
           className={`tab-button${activeTab === "compare" ? " is-active" : ""}`}
           type="button"
           onClick={() => setActiveTab("compare")}
         >
-          Compare
+          {t("detail.compare")}
         </button>
         <button
           className={`tab-button${activeTab === "versions" ? " is-active" : ""}`}
           type="button"
           onClick={() => setActiveTab("versions")}
         >
-          Versions
+          {t("detail.versions")}
         </button>
       </div>
 
@@ -158,14 +160,14 @@ export function LocalSkillDetailTabs({ slug, data }: LocalSkillDetailTabsProps) 
                 SKILL.md
               </h2>
               <p className="section-subtitle" style={{ margin: 0 }}>
-                Browse files from the latest published version.
+                {t("detail.browseLatest")}
               </p>
             </div>
             <div className="markdown">
               {readmeContent ? (
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{readmeContent}</ReactMarkdown>
               ) : (
-                <div className="stat">{data.readmeError ?? "No SKILL.md available."}</div>
+                <div className="stat">{data.readmeError ?? t("detail.noSkillMd")}</div>
               )}
             </div>
           </div>
@@ -173,7 +175,7 @@ export function LocalSkillDetailTabs({ slug, data }: LocalSkillDetailTabsProps) 
             <div className="file-list">
               <div className="file-list-header">
                 <h3 className="section-title" style={{ fontSize: "1.05rem", margin: 0 }}>
-                  Files
+                  {t("detail.files")}
                 </h3>
                 <span className="section-subtitle" style={{ margin: 0 }}>
                   {latestFiles.length}
@@ -190,17 +192,17 @@ export function LocalSkillDetailTabs({ slug, data }: LocalSkillDetailTabsProps) 
             </div>
             <div className="file-viewer">
               <div className="file-viewer-header">
-                <div className="file-path">{selectedPath ?? "Select a file"}</div>
+                <div className="file-path">{selectedPath ?? t("common.selectFile")}</div>
               </div>
               <div className="file-viewer-body">
                 {isLoadingFile ? (
-                  <div className="stat">Loading…</div>
+                  <div className="stat">{t("common.loading")}</div>
                 ) : fileError ? (
                   <div className="stat">{fileError}</div>
                 ) : fileContent ? (
                   <pre className="file-viewer-code">{fileContent}</pre>
                 ) : (
-                  <div className="stat">Select a file to preview.</div>
+                  <div className="stat">{t("common.selectToPreview")}</div>
                 )}
               </div>
             </div>
@@ -222,10 +224,10 @@ export function LocalSkillDetailTabs({ slug, data }: LocalSkillDetailTabsProps) 
         <div className="tab-body">
           <div>
             <h2 className="section-title" style={{ fontSize: "1.2rem", margin: 0 }}>
-              Versions
+              {t("detail.versions")}
             </h2>
             <p className="section-subtitle" style={{ margin: 0 }}>
-              Download older releases and inspect changelog history.
+              {t("detail.downloadOlder")}
             </p>
           </div>
           <div className="version-scroll">
@@ -239,22 +241,30 @@ export function LocalSkillDetailTabs({ slug, data }: LocalSkillDetailTabsProps) 
                   <div key={version.id} className="version-row">
                     <div className="version-info">
                       <div>
-                        {`v${version.version} · ${new Date(version.createdAt).toLocaleString()}`}
-                        {tags.length ? <span style={{ color: "var(--ink-soft)" }}>{` · ${tags.join(", ")}`}</span> : null}
+                        {`v${version.version} · ${formatDateTime(version.createdAt)}`}
+                        {tags.length ? (
+                          <span
+                            style={{ color: "var(--ink-soft)" }}
+                          >{` · ${tags.join(", ")}`}</span>
+                        ) : null}
                       </div>
                       <div className="version-meta-inline">
-                        <span>{`${version.fileCount} files`}</span>
+                        <span>{t("detail.filesCount", { count: version.fileCount })}</span>
                         <span>{formatBytes(version.fileSize)}</span>
-                        {version.version === data.latestVersion?.version ? <span>latest</span> : null}
+                        {version.version === data.latestVersion?.version ? (
+                          <span>{t("common.latest")}</span>
+                        ) : null}
                       </div>
-                      <div style={{ color: "#5c554e", whiteSpace: "pre-wrap" }}>{version.changelog || "No changelog provided."}</div>
+                      <div style={{ color: "#5c554e", whiteSpace: "pre-wrap" }}>
+                        {version.changelog || t("detail.noChangelog")}
+                      </div>
                       {editingTagsVersion === version.version ? (
                         <div className="version-tag-editor">
                           <input
                             className="form-input"
                             value={tagDraft}
                             onChange={(event) => setTagDraft(event.target.value)}
-                            placeholder="latest, stable"
+                            placeholder={t("detail.tagPlaceholder")}
                           />
                           <div className="version-tag-editor-actions">
                             <button
@@ -263,10 +273,12 @@ export function LocalSkillDetailTabs({ slug, data }: LocalSkillDetailTabsProps) 
                               onClick={() => void handleSetTags(version.version)}
                               disabled={updatingTagsVersion === version.version}
                             >
-                              {updatingTagsVersion === version.version ? "Saving…" : "Save tags"}
+                              {updatingTagsVersion === version.version
+                                ? t("detail.saving")
+                                : t("detail.saveTags")}
                             </button>
                             <button type="button" className="btn" onClick={cancelEditingTags}>
-                              Cancel
+                              {t("common.cancel")}
                             </button>
                           </div>
                         </div>
@@ -276,7 +288,7 @@ export function LocalSkillDetailTabs({ slug, data }: LocalSkillDetailTabsProps) 
                       <div className="version-actions">
                         {zipHref ? (
                           <a className="btn version-zip" href={zipHref}>
-                            Zip
+                            {t("detail.zip")}
                           </a>
                         ) : null}
                         {isAuthenticated ? (
@@ -286,7 +298,9 @@ export function LocalSkillDetailTabs({ slug, data }: LocalSkillDetailTabsProps) 
                             onClick={() => startEditingTags(version.version, tags)}
                             disabled={updatingTagsVersion === version.version}
                           >
-                            {editingTagsVersion === version.version ? "Editing tags" : "Set tags"}
+                            {editingTagsVersion === version.version
+                              ? t("detail.editingTags")
+                              : t("detail.setTags")}
                           </button>
                         ) : null}
                         {isAuthenticated ? (
@@ -296,7 +310,9 @@ export function LocalSkillDetailTabs({ slug, data }: LocalSkillDetailTabsProps) 
                             onClick={() => void handleDeleteVersion(version.version)}
                             disabled={deletingVersion === version.version || versions.length <= 1}
                           >
-                            {deletingVersion === version.version ? "Deleting…" : "Delete"}
+                            {deletingVersion === version.version
+                              ? t("detail.deleting")
+                              : t("common.delete")}
                           </button>
                         ) : null}
                       </div>
@@ -323,7 +339,12 @@ function LocalVersionFileList({
   slug: string;
   version: string | null;
   latestVersion: string | null;
-  latestFiles: Array<{ path: string; size: number; sha256: string | null; contentType: string | null }>;
+  latestFiles: Array<{
+    path: string;
+    size: number;
+    sha256: string | null;
+    contentType: string | null;
+  }>;
   selectedPath: string | null;
   onSelectPath: (path: string | null) => void;
 }) {

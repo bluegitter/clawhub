@@ -1,5 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useRef } from "react";
+import { useI18n } from "../../lib/i18n";
 import { parseSort } from "./-params";
 import { SkillsResults } from "./-SkillsResults";
 import { SkillsToolbar } from "./-SkillsToolbar";
@@ -46,6 +47,7 @@ export const Route = createFileRoute("/skills/")({
 });
 
 export function SkillsIndex() {
+  const { t } = useI18n();
   const navigate = Route.useNavigate();
   const search = Route.useSearch();
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -60,12 +62,14 @@ export function SkillsIndex() {
     <main className="section">
       <header className="skills-header-top">
         <h1 className="section-title" style={{ marginBottom: 8 }}>
-          Skills
+          {t("skills.title")}
         </h1>
         <p className="section-subtitle" style={{ marginBottom: 0 }}>
           {model.isLoadingSkills
-            ? "Loading skills…"
-            : `Browse the skill library${model.activeFilters.length ? ` (${model.activeFilters.join(", ")})` : ""}.`}
+            ? t("skills.loading")
+            : t("skills.subtitle", {
+                filters: model.activeFilters.length ? ` (${model.activeFilters.join(", ")})` : "",
+              })}
         </p>
       </header>
       <div className="skills-container">

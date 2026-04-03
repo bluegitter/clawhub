@@ -5,14 +5,16 @@ import { ClientOnly } from "../components/ClientOnly";
 import { DeploymentDriftBanner } from "../components/DeploymentDriftBanner";
 import { Footer } from "../components/Footer";
 import Header from "../components/Header";
+import { getPreferredLocale } from "../lib/i18n";
 import { getSiteDescription, getSiteMode, getSiteName, getSiteUrlForMode } from "../lib/site";
 import appCss from "../styles.css?url";
 
 export const Route = createRootRoute({
   head: () => {
     const mode = getSiteMode();
+    const locale = getPreferredLocale();
     const siteName = getSiteName(mode);
-    const siteDescription = getSiteDescription(mode);
+    const siteDescription = getSiteDescription(mode, locale);
     const siteUrl = getSiteUrlForMode(mode);
     const ogImage = `${siteUrl}/og.png`;
 
@@ -99,7 +101,7 @@ export const Route = createRootRoute({
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang={getPreferredLocale()} suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>

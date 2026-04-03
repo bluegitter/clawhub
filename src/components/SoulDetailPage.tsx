@@ -1,9 +1,10 @@
-import { useAction, useMutation, useQuery } from "../lib/convexCompat";
 import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { api } from "../../convex/_generated/api";
 import type { Doc } from "../../convex/_generated/dataModel";
+import { useAction, useMutation, useQuery } from "../lib/convexCompat";
+import { useI18n } from "../lib/i18n";
 import type { PublicSoul, PublicUser } from "../lib/publicUser";
 import { isModerator } from "../lib/roles";
 import { getRuntimeEnv } from "../lib/runtimeEnv";
@@ -46,6 +47,7 @@ type SoulBySlugResult = {
 } | null;
 
 export function SoulDetailPage({ slug }: SoulDetailPageProps) {
+  const { t, formatDate } = useI18n();
   const { isAuthenticated, me } = useAuthStatus();
   const result = useQuery(api.souls.getBySlug, { slug }) as SoulBySlugResult | undefined;
   const toggleStar = useMutation(api.soulStars.toggle);
@@ -112,7 +114,7 @@ export function SoulDetailPage({ slug }: SoulDetailPageProps) {
     return (
       <main className="section">
         <div className="card">
-          <div className="loading-indicator">Loading soul…</div>
+          <div className="loading-indicator">{t("soul.loading")}</div>
         </div>
       </main>
     );
@@ -121,7 +123,7 @@ export function SoulDetailPage({ slug }: SoulDetailPageProps) {
   if (result === null || !soul) {
     return (
       <main className="section">
-        <div className="card">Soul not found.</div>
+        <div className="card">{t("soul.notFound")}</div>
       </main>
     );
   }
@@ -139,13 +141,13 @@ export function SoulDetailPage({ slug }: SoulDetailPageProps) {
               <h1 className="section-title" style={{ margin: 0 }}>
                 {soul.displayName}
               </h1>
-              <p className="section-subtitle">{soul.summary ?? "No summary provided."}</p>
+              <p className="section-subtitle">{soul.summary ?? t("soul.noSummary")}</p>
               <div className="stat">
                 <SoulStatsTripletLine stats={soul.stats} versionSuffix="versions" />
               </div>
               {ownerHandle ? (
                 <div className="stat">
-                  by <a href={`/u/${ownerHandle}`}>@{ownerHandle}</a>
+                  {t("common.by")} <a href={`/u/${ownerHandle}`}>@{ownerHandle}</a>
                 </div>
               ) : null}
               <div className="skill-actions">
@@ -163,15 +165,15 @@ export function SoulDetailPage({ slug }: SoulDetailPageProps) {
             </div>
             <div className="skill-hero-cta">
               <div className="skill-version-pill">
-                <span className="skill-version-label">Current version</span>
+                <span className="skill-version-label">{t("soul.currentVersion")}</span>
                 <strong>v{latestVersion?.version ?? "—"}</strong>
               </div>
               <a
                 className="btn btn-primary"
                 href={`${downloadBase}?path=SOUL.md`}
-                aria-label="Download SOUL.md"
+                aria-label={t("soul.downloadReadme")}
               >
-                Download SOUL.md
+                {t("soul.downloadReadme")}
               </a>
             </div>
           </div>
@@ -182,16 +184,16 @@ export function SoulDetailPage({ slug }: SoulDetailPageProps) {
             {readmeContent ? (
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{readmeContent}</ReactMarkdown>
             ) : readmeError ? (
-              <div className="stat">Failed to load SOUL.md: {readmeError}</div>
+              <div className="stat">{t("soul.failedReadme", { error: readmeError })}</div>
             ) : (
-              <div className="loading-indicator">Loading SOUL.md…</div>
+              <div className="loading-indicator">{t("soul.loadingReadme")}</div>
             )}
           </div>
         </div>
 
         <div className="card">
           <h2 className="section-title" style={{ fontSize: "1.2rem", marginBottom: 8 }}>
-            Versions
+            {t("detail.versions")}
           </h2>
           <div className="version-scroll">
             <div className="version-list">
@@ -199,9 +201,9 @@ export function SoulDetailPage({ slug }: SoulDetailPageProps) {
                 <div key={version._id} className="version-row">
                   <div className="version-info">
                     <div>
-                      v{version.version} · {new Date(version.createdAt).toLocaleDateString()}
+                      v{version.version} · {formatDate(version.createdAt)}
                       {version.changelogSource === "auto" ? (
-                        <span style={{ color: "var(--ink-soft)" }}> · auto</span>
+                        <span style={{ color: "var(--ink-soft)" }}> · {t("detail.auto")}</span>
                       ) : null}
                     </div>
                     <div style={{ color: "#5c554e", whiteSpace: "pre-wrap" }}>
@@ -226,7 +228,7 @@ export function SoulDetailPage({ slug }: SoulDetailPageProps) {
 
         <div className="card">
           <h2 className="section-title" style={{ fontSize: "1.2rem", margin: 0 }}>
-            Comments
+            {t("soul.comments")}
           </h2>
           {isAuthenticated ? (
             <form
@@ -244,18 +246,18 @@ export function SoulDetailPage({ slug }: SoulDetailPageProps) {
                 rows={4}
                 value={comment}
                 onChange={(event) => setComment(event.target.value)}
-                placeholder="Leave a note…"
+                placeholder={t("soul.leaveNote")}
               />
               <button className="btn comment-submit" type="submit">
-                Post comment
+                {t("soul.postComment")}
               </button>
             </form>
           ) : (
-            <p className="section-subtitle">Sign in to comment.</p>
+            <p className="section-subtitle">{t("soul.signInToComment")}</p>
           )}
           <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
             {(comments ?? []).length === 0 ? (
-              <div className="stat">No comments yet.</div>
+              <div className="stat">{t("soul.noComments")}</div>
             ) : (
               (comments ?? []).map((entry) => (
                 <div key={entry.comment._id} className="comment-item">

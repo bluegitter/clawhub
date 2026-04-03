@@ -1,5 +1,5 @@
-import type { ClawdisSkillMetadata } from "clawhub-schema";
 import { Link } from "@tanstack/react-router";
+import type { ClawdisSkillMetadata } from "clawhub-schema";
 import {
   PLATFORM_SKILL_LICENSE,
   PLATFORM_SKILL_LICENSE_SUMMARY,
@@ -7,6 +7,7 @@ import {
 import { Package } from "lucide-react";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
 import { getSkillBadges } from "../lib/badges";
+import { useI18n } from "../lib/i18n";
 import { formatCompactStat, formatSkillStatsTriplet } from "../lib/numberFormat";
 import type { PublicPublisher, PublicSkill } from "../lib/publicUser";
 import { getRuntimeEnv } from "../lib/runtimeEnv";
@@ -116,6 +117,7 @@ export function SkillHeader({
   clawdis,
   osLabels,
 }: SkillHeaderProps) {
+  const { t } = useI18n();
   const convexSiteUrl = getRuntimeEnv("VITE_CONVEX_SITE_URL") ?? "https://clawhub.ai";
   const formattedStats = formatSkillStatsTriplet(skill.stats);
   const suppressScanResults =
@@ -123,52 +125,39 @@ export function SkillHeader({
     Boolean(modInfo?.overrideActive) &&
     !modInfo?.isMalwareBlocked &&
     !modInfo?.isSuspicious;
-  const overrideScanMessage = suppressScanResults
-    ? "Security findings were reviewed by staff and cleared for public use."
-    : null;
+  const overrideScanMessage = suppressScanResults ? t("skill.scanCleared") : null;
 
   return (
     <>
       {modInfo?.isPendingScan ? (
         <div className="pending-banner">
           <div className="pending-banner-content">
-            <strong>Security scan in progress</strong>
-            <p>
-              Your skill is being scanned by VirusTotal. It will be visible to others once the scan
-              completes. This usually takes up to 5 minutes — grab a coffee or exfoliate your shell
-              while you wait.
-            </p>
+            <strong>{t("skill.pendingTitle")}</strong>
+            <p>{t("skill.pendingBody")}</p>
           </div>
         </div>
       ) : modInfo?.isMalwareBlocked ? (
         <div className="pending-banner pending-banner-blocked">
           <div className="pending-banner-content">
-            <strong>Skill blocked — malicious content detected</strong>
-            <p>
-              ClawHub Security flagged this skill as malicious. Downloads are disabled. Review the
-              scan results below.
-            </p>
+            <strong>{t("skill.blockedTitle")}</strong>
+            <p>{t("skill.blockedBody")}</p>
           </div>
         </div>
       ) : modInfo?.isSuspicious ? (
         <div className="pending-banner pending-banner-warning">
           <div className="pending-banner-content">
-            <strong>Skill flagged — suspicious patterns detected</strong>
-            <p>
-              ClawHub Security flagged this skill as suspicious. Review the scan results before
-              using.
-            </p>
+            <strong>{t("skill.flaggedTitle")}</strong>
+            <p>{t("skill.flaggedBody")}</p>
             {canManage ? (
               <p className="pending-banner-appeal">
-                If you believe this skill has been incorrectly flagged, please{" "}
+                {t("skill.flaggedAppeal")}{" "}
                 <a
                   href="https://github.com/openclaw/clawhub/issues"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  submit an issue on GitHub
-                </a>{" "}
-                and we'll break down why it was flagged and what you can do.
+                  GitHub
+                </a>
               </p>
             ) : null}
           </div>
@@ -176,15 +165,15 @@ export function SkillHeader({
       ) : modInfo?.isRemoved ? (
         <div className="pending-banner pending-banner-blocked">
           <div className="pending-banner-content">
-            <strong>Skill removed by moderator</strong>
-            <p>This skill has been removed and is not visible to others.</p>
+            <strong>{t("skill.removedTitle")}</strong>
+            <p>{t("skill.removedBody")}</p>
           </div>
         </div>
       ) : modInfo?.isHiddenByMod ? (
         <div className="pending-banner pending-banner-blocked">
           <div className="pending-banner-content">
-            <strong>Skill hidden</strong>
-            <p>This skill is currently hidden and not visible to others.</p>
+            <strong>{t("skill.hiddenTitle")}</strong>
+            <p>{t("skill.hiddenBody")}</p>
           </div>
         </div>
       ) : null}
@@ -197,25 +186,28 @@ export function SkillHeader({
                 <h1 className="section-title" style={{ margin: 0 }}>
                   {skill.displayName}
                 </h1>
-                {nixPlugin ? <span className="tag tag-accent">Plugin bundle (nix)</span> : null}
+                {nixPlugin ? (
+                  <span className="tag tag-accent">{t("skill.pluginBundle")}</span>
+                ) : null}
               </div>
-              <p className="section-subtitle">{skill.summary ?? "No summary provided."}</p>
+              <p className="section-subtitle">{skill.summary ?? t("skill.noSummary")}</p>
 
               {isStaff && staffModerationNote ? (
                 <div className="skill-hero-note">{staffModerationNote}</div>
               ) : null}
               {nixPlugin ? (
-                <div className="skill-hero-note">
-                  Bundles the skill pack, CLI binary, and config requirements in one Nix install.
-                </div>
+                <div className="skill-hero-note">{t("skill.pluginBundleNote")}</div>
               ) : null}
               <div className="skill-hero-note">
                 <strong>{PLATFORM_SKILL_LICENSE}</strong> · {PLATFORM_SKILL_LICENSE_SUMMARY}
               </div>
               <div className="stat">
                 ⭐ {formattedStats.stars} · <Package size={14} aria-hidden="true" />{" "}
-                {formattedStats.downloads} · {formatCompactStat(skill.stats.installsCurrent ?? 0)}{" "}
-                current installs · {formattedStats.installsAllTime} all-time installs
+                {formattedStats.downloads} ·{" "}
+                {t("skill.currentInstalls", {
+                  count: formatCompactStat(skill.stats.installsCurrent ?? 0),
+                })}{" "}
+                · {t("skill.allTimeInstalls", { count: formattedStats.installsAllTime })}
               </div>
               <div className="stat">
                 <UserBadge
@@ -233,12 +225,12 @@ export function SkillHeader({
                     {forkOfOwnerHandle ? `@${forkOfOwnerHandle}/` : ""}
                     {forkOf.skill.slug}
                   </a>
-                  {forkOf.version ? ` (based on ${forkOf.version})` : null}
+                  {forkOf.version ? ` ${t("skill.basedOn", { version: forkOf.version })}` : null}
                 </div>
               ) : null}
               {canonicalHref ? (
                 <div className="stat">
-                  canonical:{" "}
+                  {t("skill.canonical")}:{" "}
                   <a href={canonicalHref}>
                     {canonicalOwnerHandle ? `@${canonicalOwnerHandle}/` : ""}
                     {canonical?.skill?.slug}
@@ -269,12 +261,12 @@ export function SkillHeader({
                 ) : null}
                 {isAuthenticated ? (
                   <button className="btn btn-ghost" type="button" onClick={onOpenReport}>
-                    Report
+                    {t("skill.report")}
                   </button>
                 ) : null}
                 {isStaff ? (
                   <Link className="btn" to="/management" search={{ skill: skill.slug }}>
-                    Manage
+                    {t("skill.manage")}
                   </Link>
                 ) : null}
               </div>
@@ -294,14 +286,12 @@ export function SkillHeader({
               (latestVersion?.sha256hash ||
                 latestVersion?.llmAnalysis ||
                 (latestVersion?.staticScan?.findings?.length ?? 0) > 0) ? (
-                <p className="scan-disclaimer">
-                  Like a lobster shell, security has layers — review code before you run it.
-                </p>
+                <p className="scan-disclaimer">{t("skill.scanDisclaimer")}</p>
               ) : null}
             </div>
             <div className="skill-hero-cta">
               <div className="skill-version-pill">
-                <span className="skill-version-label">Current version</span>
+                <span className="skill-version-label">{t("skill.currentVersion")}</span>
                 <strong>v{latestVersion?.version ?? "—"}</strong>
               </div>
               {!nixPlugin && !modInfo?.isMalwareBlocked && !modInfo?.isRemoved ? (
@@ -309,7 +299,7 @@ export function SkillHeader({
                   className="btn btn-primary"
                   href={`${convexSiteUrl}/api/v1/download?slug=${skill.slug}`}
                 >
-                  Download zip
+                  {t("skill.downloadZip")}
                 </a>
               ) : null}
             </div>
@@ -317,27 +307,27 @@ export function SkillHeader({
           {hasPluginBundle ? (
             <div className="skill-panel bundle-card">
               <div className="bundle-header">
-                <div className="bundle-title">Plugin bundle (nix)</div>
-                <div className="bundle-subtitle">Skill pack · CLI binary · Config</div>
+                <div className="bundle-title">{t("skill.pluginBundle")}</div>
+                <div className="bundle-subtitle">{t("skill.bundleSubtitle")}</div>
               </div>
               <div className="bundle-includes">
-                <span>SKILL.md</span>
-                <span>CLI</span>
-                <span>Config</span>
+                <span>{t("skill.bundleSkillMd")}</span>
+                <span>{t("skill.bundleCli")}</span>
+                <span>{t("skill.bundleConfig")}</span>
               </div>
               {configRequirements ? (
                 <div className="bundle-section">
-                  <div className="bundle-section-title">Config requirements</div>
+                  <div className="bundle-section-title">{t("skill.configRequirements")}</div>
                   <div className="bundle-meta">
                     {configRequirements.requiredEnv?.length ? (
                       <div className="stat">
-                        <strong>Required env</strong>
+                        <strong>{t("skill.requiredEnv")}</strong>
                         <span>{configRequirements.requiredEnv.join(", ")}</span>
                       </div>
                     ) : null}
                     {configRequirements.stateDirs?.length ? (
                       <div className="stat">
-                        <strong>State dirs</strong>
+                        <strong>{t("skill.stateDirs")}</strong>
                         <span>{configRequirements.stateDirs.join(", ")}</span>
                       </div>
                     ) : null}
@@ -346,7 +336,7 @@ export function SkillHeader({
               ) : null}
               {cliHelp ? (
                 <details className="bundle-section bundle-details">
-                  <summary>CLI help (from plugin)</summary>
+                  <summary>{t("skill.cliHelp")}</summary>
                   <pre className="hero-install-code mono">{cliHelp}</pre>
                 </details>
               ) : null}
@@ -357,7 +347,7 @@ export function SkillHeader({
         <div className="skill-tag-row">
           {tagEntries.length === 0 ? (
             <span className="section-subtitle" style={{ margin: 0 }}>
-              No tags yet.
+              {t("skill.noTags")}
             </span>
           ) : (
             tagEntries.map(([tag, versionId]) => (
@@ -371,8 +361,8 @@ export function SkillHeader({
                     type="button"
                     className="tag-delete"
                     onClick={() => onTagDelete(tag)}
-                    aria-label={`Delete tag ${tag}`}
-                    title={`Delete tag "${tag}"`}
+                    aria-label={t("skill.deleteTagLabel", { tag })}
+                    title={t("skill.deleteTag", { tag })}
                   >
                     ×
                   </button>
@@ -394,12 +384,15 @@ export function SkillHeader({
               className="search-input"
               value={tagName}
               onChange={(event) => onTagNameChange(event.target.value)}
-              placeholder="latest"
+              placeholder={t("detail.tagPlaceholder")}
             />
             <select
               className="search-input"
               value={tagVersionId ?? ""}
-              onChange={(event) => onTagVersionChange(event.target.value as Id<"skillVersions">)}
+              onChange={(event) => {
+                const nextValue = String(event.target.value) as Id<"skillVersions">;
+                onTagVersionChange(nextValue);
+              }}
             >
               {tagVersions.map((version) => (
                 <option key={version._id} value={version._id}>
@@ -408,7 +401,7 @@ export function SkillHeader({
               ))}
             </select>
             <button className="btn" type="submit">
-              Update tag
+              {t("skill.updateTag")}
             </button>
           </form>
         ) : null}

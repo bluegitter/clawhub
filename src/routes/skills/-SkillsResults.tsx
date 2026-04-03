@@ -5,6 +5,7 @@ import { getPlatformLabels } from "../../components/skillDetailUtils";
 import { SkillMetricsRow, SkillStatsTripletLine } from "../../components/SkillStats";
 import { UserBadge } from "../../components/UserBadge";
 import { getSkillBadges } from "../../lib/badges";
+import { useI18n } from "../../lib/i18n";
 import { shouldUseLocalBackend } from "../../lib/localBackend";
 import { useLocalStars } from "../../lib/useLocalStars";
 import { buildSkillHref, type SkillListEntry } from "./-types";
@@ -34,17 +35,18 @@ export function SkillsResults({
   loadMoreRef,
   loadMore,
 }: SkillsResultsProps) {
+  const { t } = useI18n();
   const { isAuthenticated, starredSet, toggle } = useLocalStars();
 
   return (
     <>
       {isLoadingSkills ? (
         <div className="card">
-          <div className="loading-indicator">Loading skills…</div>
+          <div className="loading-indicator">{t("skills.loading")}</div>
         </div>
       ) : sorted.length === 0 ? (
         <div className="card">
-          {listDoneLoading || hasQuery ? "No skills match that filter." : "Loading skills…"}
+          {listDoneLoading || hasQuery ? t("skills.noMatch") : t("skills.loading")}
         </div>
       ) : view === "cards" ? (
         <div className="grid">
@@ -61,15 +63,15 @@ export function SkillsResults({
                 skill={skill}
                 href={skillHref}
                 badge={getSkillBadges(skill)}
-                chip={isPlugin ? "Plugin bundle (nix)" : undefined}
+                chip={isPlugin ? t("skills.pluginBundle") : undefined}
                 platformLabels={platforms.length ? platforms : undefined}
-                summaryFallback="Agent-ready skill pack."
+                summaryFallback={t("home.skills.summaryReady")}
                 meta={
                   <div className="skill-card-footer-rows">
                     <UserBadge
                       user={entry.owner}
                       fallbackHandle={ownerHandle}
-                      prefix="by"
+                      prefix={t("common.by")}
                       link={false}
                     />
                     <div className="stat">
@@ -96,10 +98,10 @@ export function SkillsResults({
       ) : (
         <div className="skills-table">
           <div className="skills-table-header">
-            <span>Skill</span>
-            <span>Summary</span>
-            <span>Author</span>
-            <span className="skills-table-stats">Stats</span>
+            <span>{t("skills.headerSkill")}</span>
+            <span>{t("skills.headerSummary")}</span>
+            <span>{t("skills.headerAuthor")}</span>
+            <span className="skills-table-stats">{t("skills.headerStats")}</span>
           </div>
           {sorted.map((entry) => {
             const skill = entry.skill;
@@ -111,7 +113,9 @@ export function SkillsResults({
                   <span>
                     {skill.displayName}
                     {getSkillBadges(skill).map((badge) => (
-                      <span key={badge} className="tag tag-compact">{badge}</span>
+                      <span key={badge} className="tag tag-compact">
+                        {badge}
+                      </span>
                     ))}
                   </span>
                   {entry.latestVersion?.version ? (
@@ -119,7 +123,7 @@ export function SkillsResults({
                   ) : null}
                 </Link>
                 <span className="skills-table-summary">
-                  {skill.summary ?? "No summary provided."}
+                  {skill.summary ?? t("skills.noSummary")}
                 </span>
                 <span className="skills-table-author">
                   <UserBadge
@@ -156,13 +160,13 @@ export function SkillsResults({
         >
           {canAutoLoad ? (
             isLoadingMore ? (
-              "Loading more…"
+              t("skills.loadingMore")
             ) : (
-              "Scroll to load more"
+              t("skills.scrollMore")
             )
           ) : (
             <button className="btn" type="button" onClick={loadMore} disabled={isLoadingMore}>
-              {isLoadingMore ? "Loading…" : "Load more"}
+              {isLoadingMore ? t("skills.loadingButton") : t("skills.loadMore")}
             </button>
           )}
         </div>

@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Plug, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useI18n } from "../lib/i18n";
 import { deleteLocalSkill, fetchLocalSkillsList } from "../lib/localBackend";
-import { formatCompactStat } from "../lib/numberFormat";
 import type { LocalSkillListEntry } from "../lib/localBackend";
+import { formatCompactStat } from "../lib/numberFormat";
 import { useAuthStatus } from "../lib/useAuthStatus";
 
 const emptyPluginPublishSearch = {
@@ -20,6 +21,7 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 function Dashboard() {
+  const { t } = useI18n();
   const { me, isAuthenticated, isLoading } = useAuthStatus();
   const [skills, setSkills] = useState<LocalSkillListEntry[]>([]);
   const [loadingSkills, setLoadingSkills] = useState(false);
@@ -56,7 +58,7 @@ function Dashboard() {
   if (isLoading) {
     return (
       <main className="section">
-        <div className="card">Loading dashboard…</div>
+        <div className="card">{t("dashboard.loading")}</div>
       </main>
     );
   }
@@ -64,7 +66,7 @@ function Dashboard() {
   if (!isAuthenticated || !me) {
     return (
       <main className="section">
-        <div className="card">Sign in to access your dashboard.</div>
+        <div className="card">{t("dashboard.signIn")}</div>
       </main>
     );
   }
@@ -72,7 +74,7 @@ function Dashboard() {
   const ownerHandle = me.handle ?? me.displayName ?? me.name ?? "unknown";
 
   async function handleDeleteSkill(slug: string) {
-    if (!window.confirm(`Delete ${slug}? This will remove all published versions.`)) return;
+    if (!window.confirm(t("dashboard.deleteConfirm", { slug }))) return;
     setDeletingSlug(slug);
     try {
       await deleteLocalSkill(slug);
@@ -89,16 +91,16 @@ function Dashboard() {
       <div className="dashboard-header">
         <div style={{ display: "grid", gap: "6px" }}>
           <h1 className="section-title" style={{ margin: 0 }}>
-            Publisher Dashboard
+            {t("dashboard.title")}
           </h1>
           <p className="section-subtitle" style={{ margin: 0 }}>
-            Local view of the skills published under your current account.
+            {t("dashboard.subtitle")}
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <Link to="/publish-skill" search={{ updateSlug: undefined }} className="btn btn-primary">
             <Upload className="h-4 w-4" aria-hidden="true" />
-            Publish Skill
+            {t("dashboard.publishSkill")}
           </Link>
           <Link
             to="/publish-plugin"
@@ -106,7 +108,7 @@ function Dashboard() {
             className="btn"
           >
             <Plug className="h-4 w-4" aria-hidden="true" />
-            Publish Plugin
+            {t("dashboard.publishPlugin")}
           </Link>
         </div>
       </div>
@@ -116,31 +118,35 @@ function Dashboard() {
           <section className="dashboard-collection-block">
             <div className="dashboard-section-header">
               <div>
-                <h2 className="dashboard-collection-title">Published Skills</h2>
+                <h2 className="dashboard-collection-title">{t("dashboard.publishedSkills")}</h2>
                 <p className="section-subtitle" style={{ margin: "6px 0 0" }}>
-                  Skills currently owned by @{ownerHandle} in the local registry.
+                  {t("dashboard.publishedSkillsSubtitle", { owner: ownerHandle })}
                 </p>
               </div>
             </div>
             {loadingSkills ? (
-              <div className="dashboard-inline-empty">Loading your skills…</div>
+              <div className="dashboard-inline-empty">{t("dashboard.loadingSkills")}</div>
             ) : skills.length === 0 ? (
               <div className="dashboard-inline-empty">
                 <div className="dashboard-inline-empty-copy">
-                  <strong>No skills yet.</strong> Publish your first skill to seed the local registry.
+                  <strong>{t("dashboard.noSkills")}</strong> {t("dashboard.noSkillsSubtitle")}
                 </div>
-                <Link to="/publish-skill" search={{ updateSlug: undefined }} className="btn btn-primary">
+                <Link
+                  to="/publish-skill"
+                  search={{ updateSlug: undefined }}
+                  className="btn btn-primary"
+                >
                   <Upload className="h-4 w-4" aria-hidden="true" />
-                  Publish Skill
+                  {t("dashboard.publishSkill")}
                 </Link>
               </div>
             ) : (
               <div className="dashboard-list">
                 <div className="dashboard-list-header">
-                  <span>Skill</span>
-                  <span>Summary</span>
-                  <span>Stats</span>
-                  <span>Actions</span>
+                  <span>{t("dashboard.skillColumn")}</span>
+                  <span>{t("dashboard.summaryColumn")}</span>
+                  <span>{t("dashboard.statsColumn")}</span>
+                  <span>{t("dashboard.actionsColumn")}</span>
                 </div>
                 {skills.map((entry) => (
                   <SkillRow
@@ -158,16 +164,15 @@ function Dashboard() {
           <section className="dashboard-collection-block">
             <div className="dashboard-section-header">
               <div>
-                <h2 className="dashboard-collection-title">Plugins</h2>
+                <h2 className="dashboard-collection-title">{t("dashboard.plugins")}</h2>
                 <p className="section-subtitle" style={{ margin: "6px 0 0" }}>
-                  Local plugin registry views have not been migrated yet.
+                  {t("dashboard.pluginsSubtitle")}
                 </p>
               </div>
             </div>
             <div className="dashboard-inline-empty">
               <div className="dashboard-inline-empty-copy">
-                <strong>Plugin management is not available yet.</strong> The publish entry remains,
-                but dashboard views still need a local backend implementation.
+                <strong>{t("dashboard.pluginsEmpty")}</strong> {t("dashboard.pluginsEmptySubtitle")}
               </div>
               <Link
                 to="/publish-plugin"
@@ -175,7 +180,7 @@ function Dashboard() {
                 className="btn"
               >
                 <Plug className="h-4 w-4" aria-hidden="true" />
-                Open Publish Plugin
+                {t("dashboard.openPublishPlugin")}
               </Link>
             </div>
           </section>
@@ -196,8 +201,9 @@ function SkillRow({
   deletingSlug: string | null;
   onDelete: (slug: string) => void;
 }) {
+  const { t } = useI18n();
   const stats = entry.skill.stats;
-  const latestVersion = entry.latestVersion?.version ?? "unversioned";
+  const latestVersion = entry.latestVersion?.version ?? t("dashboard.unversioned");
   const hrefOwner = entry.ownerHandle ?? ownerHandle;
 
   return (
@@ -213,9 +219,11 @@ function SkillRow({
           </Link>
           <span className="dashboard-list-id">/{entry.skill.slug}</span>
         </div>
-        <div className="dashboard-list-meta">Latest version: {latestVersion}</div>
+        <div className="dashboard-list-meta">
+          {t("dashboard.latestVersion", { version: latestVersion })}
+        </div>
       </div>
-      <div className="dashboard-list-secondary">{entry.skill.summary ?? "No summary provided."}</div>
+      <div className="dashboard-list-secondary">{entry.skill.summary ?? t("skill.noSummary")}</div>
       <div className="dashboard-list-secondary">
         {[
           `↓ ${formatCompactStat(stats.downloads)}`,
@@ -224,15 +232,19 @@ function SkillRow({
         ].join(" · ")}
       </div>
       <div className="dashboard-list-actions">
-        <Link to="/$owner/$slug" params={{ owner: hrefOwner, slug: entry.skill.slug }} className="btn">
-          View
+        <Link
+          to="/$owner/$slug"
+          params={{ owner: hrefOwner, slug: entry.skill.slug }}
+          className="btn"
+        >
+          {t("dashboard.view")}
         </Link>
         <Link
           to="/publish-skill"
           search={{ updateSlug: entry.skill.slug }}
           className="btn btn-primary"
         >
-          Release
+          {t("dashboard.release")}
         </Link>
         <button
           type="button"
@@ -240,7 +252,7 @@ function SkillRow({
           onClick={() => void onDelete(entry.skill.slug)}
           disabled={deletingSlug === entry.skill.slug}
         >
-          {deletingSlug === entry.skill.slug ? "Deleting…" : "Delete"}
+          {deletingSlug === entry.skill.slug ? t("dashboard.deleting") : t("common.delete")}
         </button>
       </div>
     </div>

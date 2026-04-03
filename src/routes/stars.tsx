@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useI18n } from "../lib/i18n";
 import type { LocalStarredSkillEntry } from "../lib/localBackend";
 import { listLocalStarredSkills, toggleLocalStar } from "../lib/localBackend";
-import { formatCompactStat } from "../lib/numberFormat";
 import { useAuthStatus } from "../lib/useAuthStatus";
 
 export const Route = createFileRoute("/stars")({
@@ -10,6 +10,7 @@ export const Route = createFileRoute("/stars")({
 });
 
 function Stars() {
+  const { t, formatCompactNumber, formatDateTime } = useI18n();
   const { me, isAuthenticated, isLoading } = useAuthStatus();
   const [items, setItems] = useState<LocalStarredSkillEntry[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
@@ -30,7 +31,9 @@ function Stars() {
       })
       .catch((loadError) => {
         if (!cancelled) {
-          setError(loadError instanceof Error ? loadError.message : "Failed to load starred skills.");
+          setError(
+            loadError instanceof Error ? loadError.message : "Failed to load starred skills.",
+          );
           setItems([]);
         }
       })
@@ -46,7 +49,7 @@ function Stars() {
   if (isLoading) {
     return (
       <main className="section">
-        <div className="card">Loading highlights…</div>
+        <div className="card">{t("stars.loading")}</div>
       </main>
     );
   }
@@ -54,23 +57,21 @@ function Stars() {
   if (!isAuthenticated || !me) {
     return (
       <main className="section">
-        <div className="card">Sign in to see your highlights.</div>
+        <div className="card">{t("stars.signIn")}</div>
       </main>
     );
   }
 
   return (
     <main className="section">
-      <h1 className="section-title">Your highlights</h1>
-      <p className="section-subtitle">
-        Saved skills from the local registry, ordered by when you starred them.
-      </p>
+      <h1 className="section-title">{t("stars.title")}</h1>
+      <p className="section-subtitle">{t("stars.subtitle")}</p>
       <div className="card" style={{ display: "grid", gap: 16 }}>
-        {loadingItems ? <div>Loading starred skills…</div> : null}
+        {loadingItems ? <div>{t("stars.loadingItems")}</div> : null}
         {error ? <div>{error}</div> : null}
         {!loadingItems && !error && items.length === 0 ? (
           <p className="section-subtitle" style={{ marginBottom: 0 }}>
-            You have not starred any local skills yet.
+            {t("stars.empty")}
           </p>
         ) : null}
         {items.map((entry) => (
@@ -83,7 +84,14 @@ function Stars() {
               borderBottom: "1px solid var(--border-subtle, rgba(255,255,255,0.1))",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "start" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 16,
+                alignItems: "start",
+              }}
+            >
               <div style={{ display: "grid", gap: 6 }}>
                 <Link
                   to="/$owner/$slug"
@@ -105,16 +113,18 @@ function Stars() {
                 className="btn"
                 onClick={() => {
                   void toggleLocalStar(entry.skill.slug).then(() => {
-                    setItems((current) => current.filter((item) => item.skill.slug !== entry.skill.slug));
+                    setItems((current) =>
+                      current.filter((item) => item.skill.slug !== entry.skill.slug),
+                    );
                   });
                 }}
               >
-                Remove star
+                {t("stars.remove")}
               </button>
             </div>
-            <div>{entry.skill.summary ?? "No summary provided."}</div>
+            <div>{entry.skill.summary ?? t("skills.noSummary")}</div>
             <div className="section-subtitle" style={{ margin: 0 }}>
-              {`★ ${formatCompactStat(entry.skill.stats.stars)} · ↓ ${formatCompactStat(entry.skill.stats.downloads)} · starred ${new Date(entry.starredAt).toLocaleString()}`}
+              {`★ ${formatCompactNumber(entry.skill.stats.stars)} · ↓ ${formatCompactNumber(entry.skill.stats.downloads)} · ${t("stars.starredAt", { date: formatDateTime(entry.starredAt) })}`}
             </div>
           </article>
         ))}
@@ -131,7 +141,7 @@ function Stars() {
           }}
           className="btn btn-primary"
         >
-          Browse skills
+          {t("stars.browse")}
         </Link>
       </div>
     </main>

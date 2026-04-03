@@ -1,4 +1,5 @@
 import { Package } from "lucide-react";
+import { useI18n } from "../lib/i18n";
 import { formatSoulStatsTriplet, type SoulStatsTriplet } from "../lib/numberFormat";
 
 export function SoulStatsTripletLine({
@@ -8,7 +9,8 @@ export function SoulStatsTripletLine({
   stats: SoulStatsTriplet;
   versionSuffix?: "v" | "versions";
 }) {
-  const formatted = formatSoulStatsTriplet(stats);
+  const { formatCompactNumber } = useI18n();
+  const formatted = formatSoulStatsTriplet(stats, formatCompactNumber);
   return (
     <>
       ⭐ {formatted.stars} · <Package size={13} aria-hidden="true" /> {formatted.downloads} ·{" "}
@@ -18,7 +20,8 @@ export function SoulStatsTripletLine({
 }
 
 export function SoulMetricsRow({ stats }: { stats: SoulStatsTriplet }) {
-  const formatted = formatSoulStatsTriplet(stats);
+  const { formatCompactNumber } = useI18n();
+  const formatted = formatSoulStatsTriplet(stats, formatCompactNumber);
   return (
     <>
       <span>

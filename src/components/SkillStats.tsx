@@ -1,4 +1,5 @@
 import { Package } from "lucide-react";
+import { useI18n } from "../lib/i18n";
 import { formatSkillStatsTriplet, type SkillStatsTriplet } from "../lib/numberFormat";
 
 type SkillMetricsStats = SkillStatsTriplet & {
@@ -6,7 +7,8 @@ type SkillMetricsStats = SkillStatsTriplet & {
 };
 
 export function SkillStatsTripletLine({ stats }: { stats: SkillStatsTriplet }) {
-  const formatted = formatSkillStatsTriplet(stats);
+  const { formatCompactNumber } = useI18n();
+  const formatted = formatSkillStatsTriplet(stats, formatCompactNumber);
   return (
     <>
       ⭐ {formatted.stars} · <Package size={13} aria-hidden="true" /> {formatted.downloads}
@@ -15,7 +17,8 @@ export function SkillStatsTripletLine({ stats }: { stats: SkillStatsTriplet }) {
 }
 
 export function SkillMetricsRow({ stats }: { stats: SkillMetricsStats }) {
-  const formatted = formatSkillStatsTriplet(stats);
+  const { formatCompactNumber } = useI18n();
+  const formatted = formatSkillStatsTriplet(stats, formatCompactNumber);
   return (
     <>
       <span>

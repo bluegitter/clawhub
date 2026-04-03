@@ -1,9 +1,10 @@
 import { useNavigate } from "@tanstack/react-router";
 import type { ClawdisSkillMetadata } from "clawhub-schema";
-import { useAction, useMutation, useQuery } from "../lib/convexCompat";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
+import { useAction, useMutation, useQuery } from "../lib/convexCompat";
+import { useI18n } from "../lib/i18n";
 import { canManageSkill, isModerator } from "../lib/roles";
 import type { SkillBySlugResult, SkillPageInitialData } from "../lib/skillPage";
 import { useAuthStatus } from "../lib/useAuthStatus";
@@ -64,6 +65,7 @@ export function SkillDetailPage({
   redirectToCanonical,
   initialData,
 }: SkillDetailPageProps) {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const { isAuthenticated, me } = useAuthStatus();
   const initialResult = initialData?.result ?? undefined;
@@ -163,9 +165,7 @@ export function SkillDetailPage({
     Boolean(modInfo?.overrideActive) &&
     !modInfo?.isMalwareBlocked &&
     !modInfo?.isSuspicious;
-  const scanResultsSuppressedMessage = suppressVersionScanResults
-    ? "Security findings on these releases were reviewed by staff and cleared for public use."
-    : null;
+  const scanResultsSuppressedMessage = suppressVersionScanResults ? t("skill.scanCleared") : null;
   const forkOfLabel = forkOf?.kind === "duplicate" ? "duplicate of" : "fork of";
   const forkOfOwnerHandle = forkOf?.owner?.handle ?? null;
   const forkOfOwnerId = forkOf?.owner?.userId ?? null;
@@ -292,7 +292,7 @@ export function SkillDetailPage({
 
   const deleteTag = (tag: string) => {
     if (!skill) return;
-    if (!window.confirm(`Delete tag "${tag}"?`)) return;
+    if (!window.confirm(t("skill.deleteTag", { tag }))) return;
     void deleteTags({
       skillId: skill._id,
       tags: [tag],
@@ -304,7 +304,7 @@ export function SkillDetailPage({
 
     const trimmedReason = reportReason.trim();
     if (!trimmedReason) {
-      setReportError("Report reason required.");
+      setReportError(t("skill.reportReasonRequired"));
       return;
     }
 
@@ -314,9 +314,9 @@ export function SkillDetailPage({
       const submission = await reportSkill({ skillId: skill._id, reason: trimmedReason });
       closeReportDialog();
       if (submission.reported) {
-        window.alert("Thanks — your report has been submitted.");
+        window.alert(t("skill.reportSubmitted"));
       } else {
-        window.alert("You have already reported this skill.");
+        window.alert(t("skill.reportAlready"));
       }
     } catch (error) {
       console.error("Failed to report skill", error);
@@ -329,7 +329,7 @@ export function SkillDetailPage({
     return (
       <main className="section">
         <div className="card">
-          <div className="loading-indicator">Loading skill…</div>
+          <div className="loading-indicator">{t("skill.loading")}</div>
         </div>
       </main>
     );
@@ -339,6 +339,7 @@ export function SkillDetailPage({
     return (
       <main className="section">
         <div className="card">Skill not found.</div>
+        <div className="card">{t("skill.notFound")}</div>
       </main>
     );
   }
@@ -401,10 +402,12 @@ export function SkillDetailPage({
         {nixSnippet ? (
           <div className="card">
             <h2 className="section-title" style={{ fontSize: "1.2rem", margin: 0 }}>
-              Install via Nix
+              {t("skill.installViaNix")}
             </h2>
             <p className="section-subtitle" style={{ margin: 0 }}>
-              {nixSystems.length ? `Systems: ${nixSystems.join(", ")}` : "nix-clawdbot"}
+              {nixSystems.length
+                ? t("skill.systems", { systems: nixSystems.join(", ") })
+                : "nix-clawdbot"}
             </p>
             <pre className="hero-install-code" style={{ marginTop: 12 }}>
               {nixSnippet}
@@ -415,10 +418,10 @@ export function SkillDetailPage({
         {configExample ? (
           <div className="card">
             <h2 className="section-title" style={{ fontSize: "1.2rem", margin: 0 }}>
-              Config example
+              {t("skill.configExample")}
             </h2>
             <p className="section-subtitle" style={{ margin: 0 }}>
-              Starter config for this plugin bundle.
+              {t("skill.configExampleSubtitle")}
             </p>
             <pre className="hero-install-code" style={{ marginTop: 12 }}>
               {configExample}
@@ -446,10 +449,10 @@ export function SkillDetailPage({
           fallback={
             <div className="card">
               <h2 className="section-title" style={{ fontSize: "1.2rem", margin: 0 }}>
-                Comments
+                {t("skill.comments")}
               </h2>
               <p className="section-subtitle" style={{ marginTop: 12, marginBottom: 0 }}>
-                Loading comments…
+                {t("skill.commentsLoading")}
               </p>
             </div>
           }

@@ -1,7 +1,8 @@
-import { useMutation, useQuery } from "../lib/convexCompat";
 import { useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
+import { useMutation, useQuery } from "../lib/convexCompat";
+import { useI18n } from "../lib/i18n";
 import { isModerator } from "../lib/roles";
 
 type SkillCommentsPanelProps = {
@@ -24,6 +25,7 @@ function formatReportError(error: unknown) {
 }
 
 export function SkillCommentsPanel({ skillId, isAuthenticated, me }: SkillCommentsPanelProps) {
+  const { t } = useI18n();
   const addComment = useMutation(api.comments.add);
   const removeComment = useMutation(api.comments.remove);
   const reportComment = useMutation(api.comments.report);
@@ -53,7 +55,7 @@ export function SkillCommentsPanel({ skillId, isAuthenticated, me }: SkillCommen
       await addComment({ skillId, body });
       setComment("");
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Failed to post comment");
+      setSubmitError(error instanceof Error ? error.message : t("comments.failedPost"));
     } finally {
       setIsSubmitting(false);
     }
@@ -66,7 +68,7 @@ export function SkillCommentsPanel({ skillId, isAuthenticated, me }: SkillCommen
     try {
       await removeComment({ commentId });
     } catch (error) {
-      setDeleteError(error instanceof Error ? error.message : "Failed to delete comment");
+      setDeleteError(error instanceof Error ? error.message : t("comments.failedDelete"));
     } finally {
       setDeletingCommentId(null);
     }
@@ -91,7 +93,7 @@ export function SkillCommentsPanel({ skillId, isAuthenticated, me }: SkillCommen
     if (isSubmittingReport) return;
     const reason = reportReason.trim();
     if (!reason) {
-      setReportError("Report reason required.");
+      setReportError(t("comments.reasonRequired"));
       return;
     }
 
@@ -101,7 +103,7 @@ export function SkillCommentsPanel({ skillId, isAuthenticated, me }: SkillCommen
     try {
       const result = await reportComment({ commentId, reason });
       setReportNotice(
-        result.alreadyReported ? "You already reported this comment." : "Report submitted.",
+        result.alreadyReported ? t("comments.alreadyReported") : t("comments.submitted"),
       );
       closeReportForm();
     } catch (error) {
@@ -113,7 +115,7 @@ export function SkillCommentsPanel({ skillId, isAuthenticated, me }: SkillCommen
   return (
     <div className="card">
       <h2 className="section-title" style={{ fontSize: "1.2rem", margin: 0 }}>
-        Comments
+        {t("comments.title")}
       </h2>
       {isAuthenticated ? (
         <form
@@ -128,22 +130,22 @@ export function SkillCommentsPanel({ skillId, isAuthenticated, me }: SkillCommen
             rows={4}
             value={comment}
             onChange={(event) => setComment(event.target.value)}
-            placeholder="Leave a note…"
+            placeholder={t("comments.leaveNote")}
             disabled={isSubmitting}
           />
           {submitError ? <div className="report-dialog-error">{submitError}</div> : null}
           <button className="btn comment-submit" type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Posting…" : "Post comment"}
+            {isSubmitting ? t("comments.posting") : t("comments.post")}
           </button>
         </form>
       ) : (
-        <p className="section-subtitle">Sign in to comment.</p>
+        <p className="section-subtitle">{t("comments.signIn")}</p>
       )}
       {deleteError ? <div className="report-dialog-error">{deleteError}</div> : null}
       {reportNotice ? <div className="stat">{reportNotice}</div> : null}
       <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
         {(comments ?? []).length === 0 ? (
-          <div className="stat">No comments yet.</div>
+          <div className="stat">{t("comments.empty")}</div>
         ) : (
           (comments ?? []).map((entry) => (
             <div key={entry.comment._id} className="comment-item">
@@ -163,7 +165,7 @@ export function SkillCommentsPanel({ skillId, isAuthenticated, me }: SkillCommen
                       rows={3}
                       value={reportReason}
                       onChange={(event) => setReportReason(event.target.value)}
-                      placeholder="Why are you reporting this comment?"
+                      placeholder={t("comments.reportPlaceholder")}
                       disabled={isSubmittingReport}
                     />
                     <div className="comment-report-actions">
@@ -173,20 +175,18 @@ export function SkillCommentsPanel({ skillId, isAuthenticated, me }: SkillCommen
                         onClick={closeReportForm}
                         disabled={isSubmittingReport}
                       >
-                        Cancel
+                        {t("common.cancel")}
                       </button>
                       <button
                         className="btn comment-submit"
                         type="submit"
                         disabled={isSubmittingReport}
                       >
-                        {isSubmittingReport ? "Reporting…" : "Submit report"}
+                        {isSubmittingReport ? t("comments.reporting") : t("comments.submitReport")}
                       </button>
                     </div>
                     {reportError ? <div className="report-dialog-error">{reportError}</div> : null}
-                    <div className="stat">
-                      Reports require a reason. Abuse of reporting may result in bans.
-                    </div>
+                    <div className="stat">{t("comments.reportNotice")}</div>
                   </form>
                 ) : null}
               </div>
@@ -199,7 +199,9 @@ export function SkillCommentsPanel({ skillId, isAuthenticated, me }: SkillCommen
                       onClick={() => void deleteComment(entry.comment._id)}
                       disabled={Boolean(deletingCommentId) || isSubmitting || isSubmittingReport}
                     >
-                      {deletingCommentId === entry.comment._id ? "Deleting…" : "Delete"}
+                      {deletingCommentId === entry.comment._id
+                        ? t("comments.deleting")
+                        : t("common.delete")}
                     </button>
                   ) : null}
                   {me._id !== entry.comment.userId ? (
@@ -213,7 +215,9 @@ export function SkillCommentsPanel({ skillId, isAuthenticated, me }: SkillCommen
                         (Boolean(reportingCommentId) && reportingCommentId !== entry.comment._id)
                       }
                     >
-                      {reportingCommentId === entry.comment._id ? "Report open" : "Report"}
+                      {reportingCommentId === entry.comment._id
+                        ? t("comments.reportOpen")
+                        : t("skill.report")}
                     </button>
                   ) : null}
                 </div>
