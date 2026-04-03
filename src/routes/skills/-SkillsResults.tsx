@@ -106,6 +106,8 @@ export function SkillsResults({
           {sorted.map((entry) => {
             const skill = entry.skill;
             const ownerHandle = entry.owner?.handle ?? entry.ownerHandle ?? null;
+            const ownerDisplayName = entry.owner?.displayName?.trim() || ownerHandle || "Unknown";
+            const ownerInitial = ownerDisplayName.charAt(0).toUpperCase();
             const skillHref = buildSkillHref(skill, ownerHandle);
             return (
               <div key={skill._id} className="skills-table-row">
@@ -135,12 +137,16 @@ export function SkillsResults({
                   ) : null}
                 </span>
                 <span className="skills-table-author">
-                  <UserBadge
-                    user={entry.owner}
-                    fallbackHandle={ownerHandle}
-                    prefix=""
-                    link={false}
-                  />
+                  <span className="user-badge user-badge-sm">
+                    <span className="user-avatar" aria-hidden="true">
+                      {entry.owner?.image ? (
+                        <img className="user-avatar-img" src={entry.owner.image} alt="" loading="lazy" />
+                      ) : (
+                        <span className="user-avatar-fallback">{ownerInitial}</span>
+                      )}
+                    </span>
+                    <span className="user-name">{ownerDisplayName}</span>
+                  </span>
                 </span>
                 <span className="skills-table-stats">
                   <SkillMetricsRow stats={skill.stats} />
