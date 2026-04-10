@@ -40,6 +40,7 @@ type SkillCanonical = {
 
 type SkillHeaderProps = {
   skill: Doc<"skills"> | PublicSkill;
+  displayedDownloadCount?: number;
   owner: PublicPublisher | null;
   ownerHandle: string | null;
   latestVersion: Doc<"skillVersions"> | null;
@@ -76,10 +77,12 @@ type SkillHeaderProps = {
   tagVersions: Doc<"skillVersions">[];
   clawdis: ClawdisSkillMetadata | undefined;
   osLabels: string[];
+  onDownload?: (version?: string | null) => void;
 };
 
 export function SkillHeader({
   skill,
+  displayedDownloadCount,
   owner,
   ownerHandle,
   latestVersion,
@@ -116,10 +119,15 @@ export function SkillHeader({
   tagVersions,
   clawdis,
   osLabels,
+  onDownload,
 }: SkillHeaderProps) {
   const { t } = useI18n();
   const convexSiteUrl = getRuntimeEnv("VITE_CONVEX_SITE_URL") ?? "https://clawhub.ai";
-  const formattedStats = formatSkillStatsTriplet(skill.stats);
+  const effectiveStats = {
+    ...skill.stats,
+    downloads: displayedDownloadCount ?? skill.stats.downloads,
+  };
+  const formattedStats = formatSkillStatsTriplet(effectiveStats);
   const suppressScanResults =
     !isStaff &&
     Boolean(modInfo?.overrideActive) &&
@@ -298,6 +306,7 @@ export function SkillHeader({
                 <a
                   className="btn btn-primary"
                   href={`${convexSiteUrl}/api/v1/download?slug=${skill.slug}`}
+                  onClick={() => onDownload?.(latestVersion?.version ?? null)}
                 >
                   {t("skill.downloadZip")}
                 </a>

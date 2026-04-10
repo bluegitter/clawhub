@@ -27,6 +27,7 @@ type SkillDetailTabsProps = {
   nixPlugin: boolean;
   suppressVersionScanResults: boolean;
   scanResultsSuppressedMessage: string | null;
+  onDownload?: (version?: string | null) => void;
 };
 
 export function SkillDetailTabs({
@@ -43,6 +44,7 @@ export function SkillDetailTabs({
   nixPlugin,
   suppressVersionScanResults,
   scanResultsSuppressedMessage,
+  onDownload,
 }: SkillDetailTabsProps) {
   const { t } = useI18n();
   return (
@@ -105,6 +107,7 @@ export function SkillDetailTabs({
           skillSlug={skill.slug}
           suppressScanResults={suppressVersionScanResults}
           suppressedMessage={scanResultsSuppressedMessage}
+          onDownload={onDownload}
         />
       ) : null}
     </div>

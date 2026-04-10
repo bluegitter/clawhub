@@ -328,6 +328,32 @@ async function ensureLocalSchema(db: DB) {
   `));
 
   await db.execute(sql.raw(`
+    CREATE TABLE IF NOT EXISTS skill_downloads (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      skill_id uuid NOT NULL REFERENCES skills(id) ON DELETE cascade,
+      version_id uuid REFERENCES skill_versions(id) ON DELETE SET NULL,
+      identity_key text NOT NULL,
+      hour_bucket integer NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
+    );
+  `));
+
+  await db.execute(sql.raw(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_skill_downloads_unique_hour
+    ON skill_downloads (skill_id, identity_key, hour_bucket);
+  `));
+
+  await db.execute(sql.raw(`
+    CREATE INDEX IF NOT EXISTS idx_skill_downloads_skill
+    ON skill_downloads (skill_id);
+  `));
+
+  await db.execute(sql.raw(`
+    CREATE INDEX IF NOT EXISTS idx_skill_downloads_version
+    ON skill_downloads (version_id);
+  `));
+
+  await db.execute(sql.raw(`
     CREATE TABLE IF NOT EXISTS skill_files (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       version_id uuid NOT NULL REFERENCES skill_versions(id) ON DELETE cascade,

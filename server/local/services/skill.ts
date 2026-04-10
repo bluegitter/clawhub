@@ -10,14 +10,28 @@ import {
   skillEmbeddings,
   skillVersionTags,
   skillAliases,
+  skillDownloads,
 } from "../db/schema/index";
 import { deleteVersionDir, getFile, storeFile } from "../storage/index";
 import { generateEmbedding, storeEmbedding } from "./search";
 import type { User } from "../db/schema/users";
 
-export async function listSkills(cursor: string | null, limit: number, options?: { label?: string | null }) {
+type LocalListSort = "newest" | "downloads" | "installs" | "stars" | "name" | "updated";
+type LocalListDir = "asc" | "desc";
+
+export async function listSkills(
+  cursor: string | null,
+  limit: number,
+  options?: {
+    label?: string | null;
+    sort?: LocalListSort;
+    dir?: LocalListDir;
+  },
+) {
   const db = getDb();
   const normalizedLabel = options?.label?.trim().toLowerCase() || null;
+  const sort = options?.sort ?? "downloads";
+  const dir = options?.dir ?? (sort === "name" ? "asc" : "desc");
   const [rows, countRow] = await Promise.all([
     normalizedLabel
       ? db
@@ -38,7 +52,6 @@ export async function listSkills(cursor: string | null, limit: number, options?:
           .innerJoin(users, eq(skills.ownerId, users.id))
           .innerJoin(skillLabels, eq(skillLabels.skillId, skills.id))
           .where(and(eq(skills.visibility, "public"), eq(skillLabels.label, normalizedLabel)))
-          .orderBy(desc(skills.updatedAt))
       : db
           .select({
             id: skills.id,
@@ -55,8 +68,7 @@ export async function listSkills(cursor: string | null, limit: number, options?:
           })
           .from(skills)
           .innerJoin(users, eq(skills.ownerId, users.id))
-          .where(eq(skills.visibility, "public"))
-          .orderBy(desc(skills.updatedAt)),
+          .where(eq(skills.visibility, "public")),
     normalizedLabel
       ? db
           .select({ count: sql<number>`cast(count(*) as int)` })
@@ -71,10 +83,39 @@ export async function listSkills(cursor: string | null, limit: number, options?:
 
   const statsBySkillId = await getSkillStatsMap(rows.map((row) => row.id));
   const labelsBySkillId = await loadSkillLabelsMap(rows.map((row) => row.id));
+  const multiplier = dir === "asc" ? 1 : -1;
+
+  const sortedRows = [...rows].sort((a, b) => {
+    const aStats = statsBySkillId.get(a.id) ?? defaultSkillStats();
+    const bStats = statsBySkillId.get(b.id) ?? defaultSkillStats();
+    const tieBreak = () => {
+      const updated = (a.updatedAt.getTime() - b.updatedAt.getTime()) * multiplier;
+      if (updated !== 0) return updated;
+      return a.slug.localeCompare(b.slug);
+    };
+
+    switch (sort) {
+      case "downloads":
+        return (aStats.downloads - bStats.downloads) * multiplier || tieBreak();
+      case "installs":
+        return (aStats.installsAllTime - bStats.installsAllTime) * multiplier || tieBreak();
+      case "stars":
+        return (aStats.stars - bStats.stars) * multiplier || tieBreak();
+      case "updated":
+        return (a.updatedAt.getTime() - b.updatedAt.getTime()) * multiplier || a.slug.localeCompare(b.slug);
+      case "name":
+        return (
+          (a.displayName.localeCompare(b.displayName) || a.slug.localeCompare(b.slug)) * multiplier
+        );
+      case "newest":
+      default:
+        return (a.createdAt.getTime() - b.createdAt.getTime()) * multiplier || tieBreak();
+    }
+  });
 
   const startIndex = decodeCursor(cursor);
-  const page = rows.slice(startIndex, startIndex + limit);
-  const nextCursor = startIndex + limit < rows.length ? String(startIndex + limit) : null;
+  const page = sortedRows.slice(startIndex, startIndex + limit);
+  const nextCursor = startIndex + limit < sortedRows.length ? String(startIndex + limit) : null;
 
   return {
     items: page.map((row) => ({
@@ -173,7 +214,7 @@ export async function getSkillStatsMap(skillIds: string[]) {
   if (normalized.length === 0) return statsMap;
 
   const db = getDb();
-  const [starRows, versionRows] = await Promise.all([
+  const [starRows, versionRows, downloadRows] = await Promise.all([
     db
       .select({
         skillId: stars.skillId,
@@ -190,6 +231,14 @@ export async function getSkillStatsMap(skillIds: string[]) {
       .from(skillVersions)
       .where(inArray(skillVersions.skillId, normalized))
       .groupBy(skillVersions.skillId),
+    db
+      .select({
+        skillId: skillDownloads.skillId,
+        count: sql<number>`cast(count(*) as int)`,
+      })
+      .from(skillDownloads)
+      .where(inArray(skillDownloads.skillId, normalized))
+      .groupBy(skillDownloads.skillId),
   ]);
 
   for (const skillId of normalized) {
@@ -208,7 +257,35 @@ export async function getSkillStatsMap(skillIds: string[]) {
     statsMap.set(row.skillId, current);
   }
 
+  for (const row of downloadRows) {
+    const current = statsMap.get(row.skillId) ?? defaultSkillStats();
+    current.downloads = Number(row.count ?? 0);
+    statsMap.set(row.skillId, current);
+  }
+
   return statsMap;
+}
+
+export async function recordSkillDownload(params: {
+  skillId: string;
+  versionId?: string | null;
+  identityKey: string;
+  now?: Date;
+}) {
+  const db = getDb();
+  const now = params.now ?? new Date();
+  const hourBucket = Math.floor(now.getTime() / (60 * 60 * 1000));
+
+  await db
+    .insert(skillDownloads)
+    .values({
+      skillId: params.skillId,
+      versionId: params.versionId ?? null,
+      identityKey: params.identityKey,
+      hourBucket,
+      createdAt: now,
+    })
+    .onConflictDoNothing();
 }
 
 export async function getVersionDetail(slug: string, version: string) {
@@ -349,6 +426,8 @@ export async function getVersionArchive(slug: string, version: string) {
   );
 
   return {
+    skillId: skill.id,
+    versionId: versionRow.id,
     slug: resolvedSlug,
     version,
     files: archiveFiles,

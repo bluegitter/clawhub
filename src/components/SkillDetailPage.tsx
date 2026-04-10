@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
 import { useAction, useMutation, useQuery } from "../lib/convexCompat";
+import { recordDownloadCountClick } from "../lib/downloadCount";
 import { useI18n } from "../lib/i18n";
 import { canManageSkill, isModerator } from "../lib/roles";
 import type { SkillBySlugResult, SkillPageInitialData } from "../lib/skillPage";
@@ -101,6 +102,7 @@ export function SkillDetailPage({
   const [reportReason, setReportReason] = useState("");
   const [reportError, setReportError] = useState<string | null>(null);
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [downloadCount, setDownloadCount] = useState(initialResult?.skill.stats.downloads ?? 0);
 
   const isLoadingSkill = isStaff ? staffResult === undefined : result === undefined;
   const skill = result?.skill;
@@ -224,6 +226,10 @@ export function SkillDetailPage({
   const latestFiles: SkillFile[] = latestVersion?.files ?? [];
 
   useEffect(() => {
+    setDownloadCount(skill?.stats.downloads ?? initialResult?.skill.stats.downloads ?? 0);
+  }, [initialResult?.skill.stats.downloads, skill?.stats.downloads]);
+
+  useEffect(() => {
     if (!wantsCanonicalRedirect || !ownerParam) return;
     void navigate({
       to: "/$owner/$slug",
@@ -325,6 +331,12 @@ export function SkillDetailPage({
     }
   };
 
+  const handleDownload = (version?: string | null) => {
+    if (!skill) return;
+    if (!recordDownloadCountClick(skill.slug, version)) return;
+    setDownloadCount((current: number) => current + 1);
+  };
+
   if (isLoadingSkill || wantsCanonicalRedirect) {
     return (
       <main className="section">
@@ -351,6 +363,7 @@ export function SkillDetailPage({
       <div className="skill-detail-stack">
         <SkillHeader
           skill={skill}
+          displayedDownloadCount={downloadCount}
           owner={owner}
           ownerHandle={ownerHandle}
           latestVersion={latestVersion}
@@ -387,6 +400,7 @@ export function SkillDetailPage({
           tagVersions={versions ?? []}
           clawdis={clawdis}
           osLabels={osLabels}
+          onDownload={handleDownload}
         />
 
         {isOwner && skill ? (
@@ -443,6 +457,7 @@ export function SkillDetailPage({
           nixPlugin={Boolean(nixPlugin)}
           suppressVersionScanResults={suppressVersionScanResults}
           scanResultsSuppressedMessage={scanResultsSuppressedMessage}
+          onDownload={handleDownload}
         />
 
         <ClientOnly

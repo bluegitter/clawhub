@@ -229,6 +229,8 @@ export async function fetchLocalSkillsList(params: {
   limit?: number;
   query?: string;
   label?: string;
+  sort?: "newest" | "downloads" | "installs" | "stars" | "name" | "updated";
+  dir?: "asc" | "desc";
 }) {
   const backend = requireLocalBackendOrigin();
   if (params.query?.trim()) {
@@ -272,6 +274,8 @@ export async function fetchLocalSkillsList(params: {
   url.searchParams.set("limit", String(params.limit ?? 25));
   if (params.cursor) url.searchParams.set("cursor", params.cursor);
   if (params.label?.trim()) url.searchParams.set("label", params.label.trim().toLowerCase());
+  if (params.sort) url.searchParams.set("sort", params.sort);
+  if (params.dir) url.searchParams.set("dir", params.dir);
   const response = await fetch(url.toString());
   if (!response.ok) throw new Error(`Failed to load skills (${response.status})`);
   const data = (await response.json()) as LocalSkillListResponse;

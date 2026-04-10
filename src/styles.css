@@ -249,6 +249,7 @@ code {
 .theme-toggle {
   display: inline-flex;
   gap: 2px;
+  align-items: center;
 }
 
 .theme-toggle button {
@@ -280,15 +281,30 @@ code {
   gap: 10px;
   border: 1px solid var(--line);
   background: var(--surface);
-  padding: 8px 12px 8px 8px;
+  min-height: 28px;
+  padding: 2px 12px 2px 6px;
   border-radius: var(--radius-pill);
   cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.user-trigger:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px rgba(255, 107, 74, 0.14);
+}
+
+.user-trigger:focus-visible {
+  outline: 3px solid rgba(255, 107, 74, 0.35);
+  outline-offset: 3px;
 }
 
 .user-trigger img,
 .user-menu-fallback {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   display: grid;
   place-items: center;

@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { InstallSwitcher } from "./InstallSwitcher";
 import { LabelChipInput } from "./LabelChipInput";
+import { recordDownloadCountClick } from "../lib/downloadCount";
 import { useI18n } from "../lib/i18n";
 import {
   getLocalStarStatus,
@@ -33,6 +34,7 @@ export function LocalSkillDetailPage({ slug, canonicalOwner, data }: LocalSkillD
   const [labelsDraft, setLabelsDraft] = useState<string[]>(data?.skill?.labels ?? []);
   const [isRenaming, setIsRenaming] = useState(false);
   const [isSavingLabels, setIsSavingLabels] = useState(false);
+  const [downloadCount, setDownloadCount] = useState(data?.skill?.stats.downloads ?? 0);
   const backendOrigin = getLocalBackendOrigin() ?? "";
 
   const latestVersion = data?.latestVersion?.version ?? null;
@@ -62,6 +64,10 @@ export function LocalSkillDetailPage({ slug, canonicalOwner, data }: LocalSkillD
   useEffect(() => {
     setLabelsDraft(data?.skill?.labels ?? []);
   }, [data?.skill?.labels]);
+
+  useEffect(() => {
+    setDownloadCount(data?.skill?.stats.downloads ?? 0);
+  }, [data?.skill?.stats.downloads]);
 
   useEffect(() => {
     if (!shouldUseLocalBackend() || !isAuthenticated || !data?.skill) {
@@ -151,6 +157,12 @@ export function LocalSkillDetailPage({ slug, canonicalOwner, data }: LocalSkillD
     }
   };
 
+  const handleDownload = (version?: string | null) => {
+    if (!data?.skill) return;
+    if (!recordDownloadCountClick(data.skill.slug, version)) return;
+    setDownloadCount((current: number) => current + 1);
+  };
+
   return (
     <main className="section">
       <div className="card skill-hero">
@@ -173,7 +185,7 @@ export function LocalSkillDetailPage({ slug, canonicalOwner, data }: LocalSkillD
                 />
               </div>
               <div className="stat">
-                ★ {starCount} · ↓ {data.skill.stats.downloads}
+                ★ {starCount} · ↓ {downloadCount}
               </div>
               {data.skill.labels?.length ? (
                 <div className="skill-card-tags" style={{ marginTop: 12 }}>
@@ -187,7 +199,11 @@ export function LocalSkillDetailPage({ slug, canonicalOwner, data }: LocalSkillD
             </div>
             <div className="skill-hero-actions">
               {downloadHref ? (
-                <a className="btn btn-primary" href={downloadHref}>
+                <a
+                  className="btn btn-primary"
+                  href={downloadHref}
+                  onClick={() => handleDownload(latestVersion)}
+                >
                   {t("localSkill.downloadLatest")}
                 </a>
               ) : null}
@@ -278,7 +294,7 @@ export function LocalSkillDetailPage({ slug, canonicalOwner, data }: LocalSkillD
           </div>
         </div>
       ) : null}
-      <LocalSkillDetailTabs slug={slug} data={data} />
+      <LocalSkillDetailTabs slug={slug} data={data} onDownload={handleDownload} />
     </main>
   );
 }

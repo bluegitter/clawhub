@@ -17,11 +17,12 @@ import { formatBytes, stripFrontmatter } from "./skillDetailUtils";
 type LocalSkillDetailTabsProps = {
   slug: string;
   data: LocalSkillDetailData;
+  onDownload?: (version?: string | null) => void;
 };
 
 type TabKey = "files" | "compare" | "versions";
 
-export function LocalSkillDetailTabs({ slug, data }: LocalSkillDetailTabsProps) {
+export function LocalSkillDetailTabs({ slug, data, onDownload }: LocalSkillDetailTabsProps) {
   const { t, formatDateTime } = useI18n();
   const { isAuthenticated } = useAuthStatus();
   const [activeTab, setActiveTab] = useState<TabKey>("files");
@@ -287,7 +288,11 @@ export function LocalSkillDetailTabs({ slug, data }: LocalSkillDetailTabsProps) 
                     {zipHref || isAuthenticated ? (
                       <div className="version-actions">
                         {zipHref ? (
-                          <a className="btn version-zip" href={zipHref}>
+                          <a
+                            className="btn version-zip"
+                            href={zipHref}
+                            onClick={() => onDownload?.(version.version)}
+                          >
                             {t("detail.zip")}
                           </a>
                         ) : null}

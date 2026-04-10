@@ -77,6 +77,8 @@ export function useSkillsBrowseModel({
           cursor,
           limit: pageSize,
           label: activeLabel || undefined,
+          sort: listSort,
+          dir,
         });
         page = result.items as SkillListEntry[];
         nextCursor = result.nextCursor;

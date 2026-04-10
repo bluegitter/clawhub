@@ -136,6 +136,79 @@ describe("SkillDetailPage", () => {
     expect(screen.getByRole("button", { name: "Files" })).toBeTruthy();
   });
 
+  it("optimistically updates the download count after clicking download", async () => {
+    window.sessionStorage.clear();
+    useQueryMock.mockImplementation((_fn: unknown, args: unknown) => {
+      if (args === "skip") return undefined;
+      if (args && typeof args === "object" && "skillId" in args) return [];
+      return undefined;
+    });
+
+    render(
+      <SkillDetailPage
+        slug="weather"
+        initialData={{
+          result: {
+            skill: {
+              _id: skillId,
+              _creationTime: 0,
+              slug: "weather",
+              displayName: "Weather",
+              summary: "Get current weather.",
+              ownerUserId: ownerId,
+              ownerPublisherId,
+              tags: {},
+              badges: {},
+              stats: {
+                stars: 12,
+                downloads: 34,
+                installsCurrent: 5,
+                installsAllTime: 8,
+                versions: 1,
+                comments: 0,
+              },
+              createdAt: 0,
+              updatedAt: 0,
+            },
+            owner: {
+              _id: ownerPublisherId,
+              _creationTime: 0,
+              kind: "user",
+              handle: "steipete",
+              displayName: "Peter",
+              image: null,
+              bio: null,
+              linkedUserId: ownerId,
+            },
+            latestVersion: {
+              _id: versionId,
+              _creationTime: 0,
+              skillId,
+              version: "1.0.0",
+              fingerprint: "abc",
+              changelog: "Initial release",
+              parsed: { license: "MIT-0", frontmatter: {} },
+              files: [],
+              createdBy: ownerId,
+              createdAt: 0,
+            },
+            forkOf: null,
+            canonical: null,
+          },
+          readme: "# Weather",
+          readmeError: null,
+        }}
+      />,
+    );
+
+    expect(await screen.findByRole("heading", { name: "Weather" })).toBeTruthy();
+    expect(screen.getByText(/34 · current installs: 5/i)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("link", { name: "Download zip" }));
+
+    expect(screen.getByText(/35 · current installs: 5/i)).toBeTruthy();
+  });
+
   it("does not refetch readme when SSR data already matches the latest version", async () => {
     useQueryMock.mockImplementation((_fn: unknown, args: unknown) => {
       if (args === "skip") return undefined;

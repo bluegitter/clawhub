@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { createHash } from "node:crypto";
 import { requireAuth, optionalAuth } from "../../middleware/auth";
 import {
   listSkills,
@@ -15,6 +16,7 @@ import {
   listAvailableSkillLabels,
   getFileForVersion,
   getVersionArchive,
+  recordSkillDownload,
 } from "../../services/skill";
 import { DEFAULT_PAGE_SIZE } from "../../db/env";
 import { getFile } from "../../storage/index";
@@ -27,11 +29,42 @@ function toResponseBody(data: Uint8Array | Buffer) {
   return Uint8Array.from(data);
 }
 
+function resolveDownloadIdentity(c: {
+  get: (key: "userId") => string | undefined;
+  req: { header: (name: string) => string | undefined };
+}) {
+  const userId = c.get("userId");
+  if (userId) return `user:${userId}`;
+
+  const forwardedFor = c.req.header("x-forwarded-for");
+  const realIp = c.req.header("x-real-ip");
+  const connectingIp = c.req.header("cf-connecting-ip");
+  const rawIp = forwardedFor?.split(",")[0]?.trim() || realIp?.trim() || connectingIp?.trim();
+  if (rawIp) {
+    const hashedIp = createHash("sha256").update(rawIp).digest("hex");
+    return `ip:${hashedIp}`;
+  }
+
+  return "anonymous";
+}
+
 app.get("/", optionalAuth, async (c) => {
   const cursor = c.req.query("cursor") ?? null;
   const limit = Math.min(parseInt(c.req.query("limit") ?? String(DEFAULT_PAGE_SIZE)), 100);
   const label = c.req.query("label")?.trim() ?? null;
-  const result = await listSkills(cursor, limit, { label });
+  const rawSort = c.req.query("sort")?.trim();
+  const rawDir = c.req.query("dir")?.trim();
+  const sort =
+    rawSort === "newest" ||
+    rawSort === "downloads" ||
+    rawSort === "installs" ||
+    rawSort === "stars" ||
+    rawSort === "name" ||
+    rawSort === "updated"
+      ? rawSort
+      : undefined;
+  const dir = rawDir === "asc" || rawDir === "desc" ? rawDir : undefined;
+  const result = await listSkills(cursor, limit, { label, sort, dir });
   return c.json(result);
 });
 
@@ -76,6 +109,11 @@ app.get("/:slug/versions/:version/download", optionalAuth, async (c) => {
   try {
     const archive = await getVersionArchive(slug, version);
     if (!archive || archive.files.length === 0) return c.json({ error: "No files" }, 404);
+    await recordSkillDownload({
+      skillId: archive.skillId,
+      versionId: archive.versionId,
+      identityKey: resolveDownloadIdentity(c),
+    });
 
     const zip = buildDeterministicZip(
       archive.files.map((f) => ({ name: f.filename, data: new Uint8Array(f.data) })),

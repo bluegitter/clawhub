@@ -9,6 +9,7 @@ type SkillVersionsPanelProps = {
   skillSlug: string;
   suppressScanResults: boolean;
   suppressedMessage: string | null;
+  onDownload?: (version?: string | null) => void;
 };
 
 export function SkillVersionsPanel({
@@ -17,6 +18,7 @@ export function SkillVersionsPanel({
   skillSlug,
   suppressScanResults,
   suppressedMessage,
+  onDownload,
 }: SkillVersionsPanelProps) {
   const { t, formatDate } = useI18n();
   const convexSiteUrl = getRuntimeEnv("VITE_CONVEX_SITE_URL") ?? "https://clawhub.ai";
@@ -59,6 +61,7 @@ export function SkillVersionsPanel({
                   <a
                     className="btn version-zip"
                     href={`${convexSiteUrl}/api/v1/download?slug=${skillSlug}&version=${version.version}`}
+                    onClick={() => onDownload?.(version.version)}
                   >
                     {t("detail.zip")}
                   </a>

@@ -30,8 +30,8 @@ export default function Header() {
   const clawHubUrl = getClawHubSiteUrl();
 
   const avatar = me?.image ?? (me?.email ? gravatarUrl(me.email) : undefined);
-  const handle = me?.handle ?? me?.displayName ?? "user";
-  const initial = (me?.displayName ?? me?.name ?? handle).charAt(0).toUpperCase();
+  const profileName = me?.displayName ?? me?.name ?? "User";
+  const initial = profileName.charAt(0).toUpperCase();
   const isStaff = isModerator(me);
   const { error: authError, clear: clearAuthError } = useAuthError();
   const localLoginHref = getLocalAuthLoginUrl("/");
@@ -243,7 +243,7 @@ export default function Header() {
                   ) : (
                     <span className="user-menu-fallback">{initial}</span>
                   )}
-                  <span className="mono">@{handle}</span>
+                  <span className="mono">{profileName}</span>
                   <span className="user-menu-chevron">▾</span>
                 </button>
               </DropdownMenuTrigger>

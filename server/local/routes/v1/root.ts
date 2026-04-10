@@ -1,9 +1,15 @@
 import { Hono } from "hono";
+import { createHash } from "node:crypto";
 import { requireAuth, optionalAuth } from "../../middleware/auth";
 import { getDb } from "../../db/index";
 import { skillLabels, skills, stars, users } from "../../db/schema/index";
 import { searchSkills } from "../../services/search";
-import { getSkillStatsMap, getVersionArchive, resolveSkillVersion } from "../../services/skill";
+import {
+  getSkillStatsMap,
+  getVersionArchive,
+  recordSkillDownload,
+  resolveSkillVersion,
+} from "../../services/skill";
 import { buildDeterministicZip } from "../../services/zipBuilder";
 import type { AuthVariables } from "../../middleware/auth";
 import { and, desc, eq, sql } from "drizzle-orm";
@@ -12,6 +18,25 @@ const app = new Hono<{ Variables: AuthVariables }>();
 
 function toResponseBody(data: Uint8Array | Buffer) {
   return Uint8Array.from(data);
+}
+
+function resolveDownloadIdentity(c: {
+  get: (key: "userId") => string | undefined;
+  req: { header: (name: string) => string | undefined };
+}) {
+  const userId = c.get("userId");
+  if (userId) return `user:${userId}`;
+
+  const forwardedFor = c.req.header("x-forwarded-for");
+  const realIp = c.req.header("x-real-ip");
+  const connectingIp = c.req.header("cf-connecting-ip");
+  const rawIp = forwardedFor?.split(",")[0]?.trim() || realIp?.trim() || connectingIp?.trim();
+  if (rawIp) {
+    const hashedIp = createHash("sha256").update(rawIp).digest("hex");
+    return `ip:${hashedIp}`;
+  }
+
+  return "anonymous";
 }
 
 app.get("/search", optionalAuth, async (c) => {
@@ -74,6 +99,11 @@ app.get("/download", optionalAuth, async (c) => {
   try {
     const archive = await getVersionArchive(slug, version);
     if (!archive || archive.files.length === 0) return c.json({ error: "No files" }, 404);
+    await recordSkillDownload({
+      skillId: archive.skillId,
+      versionId: archive.versionId,
+      identityKey: resolveDownloadIdentity(c),
+    });
     const zip = buildDeterministicZip(
       archive.files.map((f) => ({ name: f.filename, data: new Uint8Array(f.data) })),
     );

@@ -6,6 +6,7 @@ export { skillLabels, skillLabelsRelations } from "./skillLabels";
 export { skillVersionTags, skillVersionTagsRelations } from "./skillVersionTags";
 export { skillAliases, skillAliasesRelations } from "./skillAliases";
 export { skillEmbeddings } from "./skillEmbeddings";
+export { skillDownloads } from "./skillDownloads";
 export { sessions } from "./sessions";
 export { apiTokens } from "./apiTokens";
 export { stars } from "./stars";
